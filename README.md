@@ -61,7 +61,7 @@ Or run directly without global install:
 npx @extension-cli/cli --help
 ```
 
-## Skill Install by npx skills
+### Skill Install by npx skills
 
 ```bash
 npx skills add extension-cli/extension-cli --skill extension-cli
