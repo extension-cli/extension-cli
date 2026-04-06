@@ -59,6 +59,38 @@ cd <project-root>
 
 Use `extension-cli <namespace> --help` or `extension-cli <namespace> <command> --help` to view full argument and option details.
 
+### Safety: Human-in-the-loop for Destructive Commands
+
+Commands that include `remove` or `delete` now require explicit human confirmation in an interactive terminal before execution.
+
+- If terminal is non-interactive (no TTY), these commands are rejected.
+- The prompt requires explicit `YES/NO`; only `YES` continues.
+- For `extension-cli tabs remove`, the prompt previews each target tab (`tabId`, `title`, `url`) before confirmation.
+- This is intentional to reduce accidental data loss or irreversible actions.
+
+For AI Agent / non-interactive execution, use explicit acknowledgement flags:
+
+```bash
+extension-cli --yes --risk-ack "tabs remove" tabs remove --tab-ids "123"
+extension-cli --yes --risk-ack "ALL" history delete-range --range '{"startTime":1,"endTime":2}'
+```
+
+When blocked in non-interactive mode, CLI emits machine-readable JSON with code `SAFETY_CONFIRMATION_REQUIRED`.
+
+High-risk commands include:
+
+```bash
+extension-cli tabs remove
+extension-cli windows remove
+extension-cli history delete-all
+extension-cli history delete-range
+extension-cli history delete-url
+extension-cli sessions remove-tab-value
+extension-cli sessions remove-window-value
+extension-cli bookmarks remove
+extension-cli bookmarks remove-tree
+```
+
 ### Core
 
 ```bash

@@ -76,6 +76,191 @@ function formatMethodNames(names) {
   return names.map(toKebabCase)
 }
 
+function getActionCommandPath(command) {
+  const names = []
+  let current = command
+  while (current && current.parent) {
+    names.push(current.name())
+    current = current.parent
+  }
+  return names.reverse().join(' ')
+}
+
+function isDestructiveActionCommand(actionCommand) {
+  const name = String(actionCommand?.name?.() || '')
+  return /(^|-)remove($|-)/.test(name) || /(^|-)delete($|-)/.test(name)
+}
+
+function getGlobalSafetyOptions(actionCommand) {
+  if (typeof actionCommand?.optsWithGlobals === 'function') {
+    return actionCommand.optsWithGlobals()
+  }
+  return {}
+}
+
+function buildSafetyRequirementPayload(actionCommand) {
+  const commandPath = getActionCommandPath(actionCommand)
+  return {
+    code: 'SAFETY_CONFIRMATION_REQUIRED',
+    riskLevel: 'high',
+    commandPath,
+    command: `extension-cli ${commandPath}`,
+    hint: `Run with --yes --risk-ack "${commandPath}" to confirm in non-interactive mode.`,
+  }
+}
+
+function hasAgentRiskAcknowledgement(actionCommand) {
+  const options = getGlobalSafetyOptions(actionCommand)
+  const yes = Boolean(options?.yes)
+  const riskAck = String(options?.riskAck || '').trim()
+  if (!yes || !riskAck) return false
+  const commandPath = getActionCommandPath(actionCommand)
+  return riskAck === commandPath || riskAck === 'ALL'
+}
+
+function isTabsRemoveCommand(actionCommand) {
+  return actionCommand?.name?.() === 'remove' && actionCommand?.parent?.name?.() === 'tabs'
+}
+
+function parseTabIdNumber(value, source) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    throw new Error(`${source} must be an integer tab id`)
+  }
+  return n
+}
+
+function parseTabIdsForPreview(rawValue) {
+  if (rawValue === undefined || rawValue === null || rawValue === '') return []
+  if (Array.isArray(rawValue)) return rawValue.map(item => parseTabIdNumber(item, '--tab-ids'))
+  if (typeof rawValue === 'number') return [parseTabIdNumber(rawValue, '--tab-ids')]
+
+  const text = String(rawValue).trim()
+  if (!text) return []
+  if (text.startsWith('[')) {
+    let parsed
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      throw new Error('Invalid JSON in --tab-ids')
+    }
+    if (!Array.isArray(parsed)) throw new Error('--tab-ids JSON must be an array')
+    return parsed.map(item => parseTabIdNumber(item, '--tab-ids'))
+  }
+  if (text.includes(',')) {
+    return text
+      .split(',')
+      .map(part => parseTabIdNumber(part.trim(), '--tab-ids'))
+  }
+  return [parseTabIdNumber(text, '--tab-ids')]
+}
+
+function extractTabIdsFromTabsRemove(actionCommand) {
+  const opts = typeof actionCommand?.opts === 'function' ? actionCommand.opts() : {}
+  if (opts?.args !== undefined) {
+    let parsedArgs
+    try {
+      parsedArgs = JSON.parse(String(opts.args))
+    } catch {
+      throw new Error('Invalid JSON for --args')
+    }
+    if (!Array.isArray(parsedArgs)) {
+      throw new Error('--args must be a JSON array')
+    }
+    return parseTabIdsForPreview(parsedArgs[0])
+  }
+  return parseTabIdsForPreview(opts?.tabIds)
+}
+
+async function buildTabsRemovePreview(actionCommand) {
+  const tabIds = extractTabIdsFromTabsRemove(actionCommand)
+  if (tabIds.length === 0) return []
+
+  const previews = []
+  for (const tabId of tabIds) {
+    try {
+      const tab = await browserTabsMethod('get', [tabId])
+      previews.push({
+        tabId,
+        title: String(tab?.title || '(untitled)'),
+        url: String(tab?.url || '(no url)'),
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      previews.push({
+        tabId,
+        title: '(unavailable)',
+        url: `(failed to load tab metadata: ${message})`,
+      })
+    }
+  }
+  return previews
+}
+
+async function confirmDestructiveAction(actionCommand) {
+  if (hasAgentRiskAcknowledgement(actionCommand)) {
+    return
+  }
+
+  if (!input.isTTY || !output.isTTY) {
+    const payload = buildSafetyRequirementPayload(actionCommand)
+    const message = `${payload.code}: ${payload.command}`
+    const error = new Error(message)
+    error.safetyPayload = payload
+    throw error
+  }
+
+  const commandPath = getActionCommandPath(actionCommand)
+  const ANSI = {
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    yellow: '\x1b[33m',
+    red: '\x1b[31m',
+  }
+
+  let tabsRemovePreview = []
+  if (isTabsRemoveCommand(actionCommand)) {
+    try {
+      tabsRemovePreview = await buildTabsRemovePreview(actionCommand)
+    } catch {
+      tabsRemovePreview = []
+    }
+  }
+
+  const rl = createInterface({ input, output })
+  try {
+    output.write(
+      `${ANSI.bold}${ANSI.yellow}[HUMAN-IN-THE-LOOP] Destructive command detected${ANSI.reset}\n`,
+    )
+    output.write(`${ANSI.yellow}Command:${ANSI.reset} extension-cli ${commandPath}\n`)
+    output.write(
+      `${ANSI.bold}${ANSI.yellow}Warning:${ANSI.reset} ` +
+      `${ANSI.yellow}This operation may delete data or close resources and may be irreversible.${ANSI.reset}\n`,
+    )
+
+    if (tabsRemovePreview.length > 0) {
+      output.write(`${ANSI.bold}${ANSI.yellow}Tabs to be removed:${ANSI.reset}\n`)
+      for (const item of tabsRemovePreview) {
+        output.write(
+          `${ANSI.yellow}- tabId=${item.tabId}${ANSI.reset}\n` +
+          `  title: ${item.title}\n` +
+          `  url:   ${item.url}\n`,
+        )
+      }
+    }
+
+    const answer = await rl.question(
+      `${ANSI.yellow}Proceed? [YES/NO]: ${ANSI.reset}`,
+    )
+    const normalized = answer.trim().toUpperCase()
+    if (normalized !== 'YES') {
+      throw new Error('Command cancelled by user.')
+    }
+  } finally {
+    rl.close()
+  }
+}
+
 function parseBooleanOption(value, optionName) {
   if (value === undefined || value === null || value === '') return true
   const normalized = String(value).trim().toLowerCase()
@@ -386,6 +571,21 @@ program
   .name('extension-cli')
   .description('Browser + rendering automation CLI')
   .version('0.1.0')
+  .option('--yes', 'Acknowledge and proceed for interactive safety prompts')
+  .option('--risk-ack <commandPath>', 'Explicit risk acknowledgement token (e.g. "tabs remove", or "ALL")')
+
+program.hook('preAction', async (_thisCommand, actionCommand) => {
+  if (!isDestructiveActionCommand(actionCommand)) return
+  try {
+    await confirmDestructiveAction(actionCommand)
+  } catch (error) {
+    if (error && typeof error === 'object' && error.safetyPayload) {
+      console.error(JSON.stringify(error.safetyPayload))
+    }
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
+})
 
 program
   .command('doctor')
