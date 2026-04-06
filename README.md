@@ -20,6 +20,12 @@ npx @extension-cli/cli --help
 
 Note: the executable command is still `extension-cli`.
 
+## Skill Install (One Command)
+
+```bash
+npx @extension-cli/cli@latest skills install extension-cli
+```
+
 ## Project Governance
 
 - Contributing guide: `CONTRIBUTING.md`
@@ -40,12 +46,9 @@ pnpm run build
 - Open `chrome://extensions`
 - Enable Developer mode
 - Click `Load unpacked`
-- Chrome: choose `<project-root>/extension/dist/chrome-mv3`
-- Edge: choose `<project-root>/extension/dist/edge-mv3`
-- Firefox: use `<project-root>/extension/dist/firefox-mv3` as temporary add-on
-
-Backward compatibility:
-- `<project-root>/extension` is still supported for Chrome (kept for existing workflow).
+- Chrome: choose `<project-root>/extension/.output/chrome-mv3`
+- Edge: choose `<project-root>/extension/.output/edge-mv3`
+- Firefox: use `<project-root>/extension/.output/firefox-mv3` as temporary add-on
 
 3. Back to project root
 ```bash
@@ -65,6 +68,9 @@ extension-cli status [--verify-rendering-token]
 extension-cli daemon status
 extension-cli daemon start
 extension-cli daemon stop
+
+extension-cli skills list
+extension-cli skills install extension-cli
 ```
 
 ### Tabs (`chrome.tabs`)

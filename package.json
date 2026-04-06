@@ -30,7 +30,7 @@
   "scripts": {
     "start": "node src/cli.mjs",
     "daemon": "node src/daemon.mjs",
-    "build": "pnpm --dir extension install && pnpm --dir extension run build",
+    "build": "CI=true pnpm --dir extension install --no-frozen-lockfile && cd extension && pnpm run build",
     "check": "node src/cli.mjs --help",
     "link": "pnpm link --global",
     "test:tabs": "pnpm exec vitest run src/browser/tabs-methods.test.mjs",
@@ -40,7 +40,7 @@
     "test:sessions": "pnpm exec vitest run src/browser/sessions-methods.test.mjs",
     "test:bookmarks": "pnpm exec vitest run src/browser/bookmarks-methods.test.mjs",
     "test:browser-api": "pnpm run test:tabs && pnpm run test:tab-groups && pnpm run test:windows && pnpm run test:history && pnpm run test:sessions && pnpm run test:bookmarks",
-    "prepack": "pnpm --dir extension install && pnpm --dir extension run build"
+    "prepack": "CI=true pnpm --dir extension install --no-frozen-lockfile && cd extension && pnpm run build"
   },
   "publishConfig": {
     "access": "public"
@@ -48,11 +48,8 @@
   "files": [
     "src/**",
     "!src/**/*.test.mjs",
-    "extension/dist/**",
-    "extension/icons/**",
-    "extension/manifest.json",
-    "extension/popup.html",
-    "extension/popup.js",
+    "skills/**",
+    "extension/.output/**",
     "README.md"
   ],
   "dependencies": {
