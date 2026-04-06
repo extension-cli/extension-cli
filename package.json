@@ -1,0 +1,65 @@
+{
+  "name": "@extension-cli/cli",
+  "version": "0.1.0",
+  "description": "Browser Extension + rendering automation CLI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/extension-cli/extension-cli.git"
+  },
+  "homepage": "https://github.com/extension-cli/extension-cli#readme",
+  "bugs": {
+    "url": "https://github.com/extension-cli/extension-cli/issues"
+  },
+  "keywords": [
+    "extension-cli",
+    "chrome-extension",
+    "browser-automation",
+    "cli",
+    "tabs",
+    "bookmarks",
+    "history",
+    "sessions",
+    "cloudflare",
+    "rendering"
+  ],
+  "type": "module",
+  "bin": {
+    "extension-cli": "src/cli.mjs"
+  },
+  "scripts": {
+    "start": "node src/cli.mjs",
+    "daemon": "node src/daemon.mjs",
+    "build": "pnpm --dir extension install && pnpm --dir extension run build",
+    "check": "node src/cli.mjs --help",
+    "link": "pnpm link --global",
+    "test:tabs": "pnpm exec vitest run src/browser/tabs-methods.test.mjs",
+    "test:tab-groups": "pnpm exec vitest run src/browser/tab-groups-methods.test.mjs",
+    "test:windows": "pnpm exec vitest run src/browser/windows-methods.test.mjs",
+    "test:history": "pnpm exec vitest run src/browser/history-methods.test.mjs",
+    "test:sessions": "pnpm exec vitest run src/browser/sessions-methods.test.mjs",
+    "test:bookmarks": "pnpm exec vitest run src/browser/bookmarks-methods.test.mjs",
+    "test:browser-api": "pnpm run test:tabs && pnpm run test:tab-groups && pnpm run test:windows && pnpm run test:history && pnpm run test:sessions && pnpm run test:bookmarks",
+    "prepack": "pnpm --dir extension install && pnpm --dir extension run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/**",
+    "!src/**/*.test.mjs",
+    "extension/dist/**",
+    "extension/icons/**",
+    "extension/manifest.json",
+    "extension/popup.html",
+    "extension/popup.js",
+    "README.md"
+  ],
+  "dependencies": {
+    "commander": "^12.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,2 @@
+export const DEFAULT_DAEMON_PORT = 19883
+export const DEFAULT_DAEMON_IDLE_TIMEOUT = 4 * 60 * 60 * 1000

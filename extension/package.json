@@ -1,0 +1,21 @@
+{
+  "name": "@extension-cli/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt -b chrome --mv3",
+    "build": "pnpm run build:chrome && pnpm run build:firefox && pnpm run build:edge && pnpm run build:compat",
+    "build:chrome": "wxt build -b chrome --mv3",
+    "build:firefox": "wxt build -b firefox --mv3",
+    "build:edge": "wxt build -b edge --mv3",
+    "build:compat": "node scripts/sync-legacy-build.mjs",
+    "package:release": "node scripts/package-release.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "typescript": "^5.7.0",
+    "wxt": "^0.20.17"
+  }
+}

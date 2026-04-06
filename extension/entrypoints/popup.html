@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 280px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fff;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .header img { width: 24px; height: 24px; }
+    .header h1 { font-size: 15px; font-weight: 600; }
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f5f5f5;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.connected { background: #34c759; }
+    .dot.disconnected { background: #ff3b30; }
+    .dot.connecting { background: #ff9500; }
+    .status-text { font-size: 13px; color: #555; }
+    .status-text strong { color: #333; }
+    .hint {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: #f0f4ff;
+      font-size: 11px;
+      color: #666;
+      line-height: 1.5;
+      display: none;
+    }
+    .hint code {
+      background: #e8ecf1;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+    .section {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #f7f7f7;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 6px;
+      font-size: 12px;
+      color: #444;
+    }
+    .item:first-of-type {
+      margin-top: 0;
+    }
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge.ok {
+      color: #0d7a2f;
+      background: #e8f7ee;
+    }
+    .badge.warn {
+      color: #995c00;
+      background: #fff4df;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: #666;
+      margin-top: 8px;
+      word-break: break-all;
+    }
+    .footer {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 11px;
+      color: #999;
+    }
+    .footer a { color: #007aff; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    .perm-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #444;
+    }
+    .perm-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn {
+      border: 1px solid #d7dbe3;
+      border-radius: 6px;
+      padding: 3px 8px;
+      background: #fff;
+      color: #333;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .btn:hover {
+      background: #f6f8fb;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <img src="icons/icon-48.png" alt="extension-cli">
+    <h1>extension-cli</h1>
+  </div>
+  <div class="status-row">
+    <span class="dot disconnected" id="dot"></span>
+    <span class="status-text" id="status">Checking...</span>
+  </div>
+  <div class="hint" id="hint">
+    This is normal. The extension connects automatically when you run any <code>extension-cli</code> command.
+  </div>
+  <div class="section">
+    <div class="section-title">Connections</div>
+    <div class="item">
+      <span>Daemon WebSocket</span>
+      <span class="badge warn" id="daemonWsBadge">Checking</span>
+    </div>
+    <div class="item">
+      <span><code>chrome.tabs</code> events bridge</span>
+      <span class="badge warn" id="tabsEventsBadge">Checking</span>
+    </div>
+    <div class="item">
+      <span><code>chrome.tabGroups</code> events bridge</span>
+      <span class="badge warn" id="tabGroupsEventsBadge">Checking</span>
+    </div>
+    <div class="item">
+      <span><code>chrome.windows</code> events bridge</span>
+      <span class="badge warn" id="windowsEventsBadge">Checking</span>
+    </div>
+    <div class="item">
+      <span><code>chrome.history</code> events bridge</span>
+      <span class="badge warn" id="historyEventsBadge">Checking</span>
+    </div>
+    <div class="item">
+      <span><code>chrome.sessions</code> events bridge</span>
+      <span class="badge warn" id="sessionsEventsBadge">Checking</span>
+    </div>
+    <div class="item">
+      <span><code>chrome.bookmarks</code> events bridge</span>
+      <span class="badge warn" id="bookmarksEventsBadge">Checking</span>
+    </div>
+    <div class="mono" id="bridgeMeta">Loading bridge details...</div>
+  </div>
+  <div class="section">
+    <div class="section-title">Privacy Permissions</div>
+    <div class="perm-row">
+      <span><code>bookmarks</code></span>
+      <div class="perm-actions">
+        <span class="badge warn" id="perm-bookmarks">Checking</span>
+        <button class="btn" id="grant-bookmarks">Grant</button>
+        <button class="btn" id="revoke-bookmarks">Revoke</button>
+      </div>
+    </div>
+    <div class="perm-row">
+      <span><code>history</code></span>
+      <div class="perm-actions">
+        <span class="badge warn" id="perm-history">Checking</span>
+        <button class="btn" id="grant-history">Grant</button>
+        <button class="btn" id="revoke-history">Revoke</button>
+      </div>
+    </div>
+    <div class="perm-row">
+      <span><code>sessions</code></span>
+      <div class="perm-actions">
+        <span class="badge warn" id="perm-sessions">Checking</span>
+        <button class="btn" id="grant-sessions">Grant</button>
+        <button class="btn" id="revoke-sessions">Revoke</button>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <a href="https://github.com/extension-cli/extension-cli" target="_blank">Documentation</a>
+  </div>
+  <script src="/popup-main.js"></script>
+</body>
+</html>
