@@ -1,11 +1,8 @@
 #!/usr/bin/env node
 import { Command, InvalidArgumentError } from 'commander'
-import fs from 'node:fs/promises'
-import os from 'node:os'
 import path from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
-import { fileURLToPath } from 'node:url'
 import {
   browserBookmarksMethod,
   browserPermissionsContains,
@@ -46,8 +43,6 @@ import {
 import { syncBookmarksStore, syncHistoryStore } from './browser/sync.mjs'
 
 const program = new Command()
-const HERE = path.dirname(fileURLToPath(import.meta.url))
-const BUILTIN_SKILLS_DIR = path.resolve(HERE, '../skills')
 const PRIVACY_PERMISSION_BY_NAMESPACE = {
   bookmarks: 'bookmarks',
   history: 'history',
@@ -293,114 +288,6 @@ function parseGroupByOption(value, optionName) {
   throw new InvalidArgumentError(`${optionName} must be one of: month, year`)
 }
 
-function resolveCodexSkillsDir(overrideDir) {
-  if (overrideDir) return path.resolve(overrideDir)
-  const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
-  return path.join(codexHome, 'skills')
-}
-
-function isSimpleSkillName(value) {
-  return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(value)
-}
-
-async function listBuiltinSkills() {
-  const entries = await fs.readdir(BUILTIN_SKILLS_DIR, { withFileTypes: true })
-  const names = []
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue
-    const skillName = entry.name
-    const skillFile = path.join(BUILTIN_SKILLS_DIR, skillName, 'SKILL.md')
-    try {
-      await fs.access(skillFile)
-      names.push(skillName)
-    } catch {
-      // Ignore folders without SKILL.md
-    }
-  }
-  return names.sort()
-}
-
-async function resolveSkillSource(source) {
-  const normalized = String(source || '').trim()
-  if (!normalized) {
-    throw new Error('Skill source is required')
-  }
-
-  const builtinNames = await listBuiltinSkills()
-  const builtinMap = new Set(builtinNames)
-  const builtinName = normalized.startsWith('builtin:') ? normalized.slice('builtin:'.length) : normalized
-  if (builtinMap.has(builtinName)) {
-    return {
-      type: 'builtin',
-      name: builtinName,
-      sourcePath: path.join(BUILTIN_SKILLS_DIR, builtinName),
-      builtinNames,
-    }
-  }
-
-  const localPath = path.resolve(normalized)
-  const localSkillFile = path.join(localPath, 'SKILL.md')
-  try {
-    await fs.access(localSkillFile)
-    return {
-      type: 'local',
-      name: path.basename(localPath),
-      sourcePath: localPath,
-      builtinNames,
-    }
-  } catch {
-    throw new Error(
-      `Unknown skill source: ${normalized}. Try one of built-in skills: ${builtinNames.join(', ')}`,
-    )
-  }
-}
-
-async function installSkill({ source, name, dir, force }) {
-  const resolved = await resolveSkillSource(source)
-  const targetRoot = resolveCodexSkillsDir(dir)
-  const targetName = name || resolved.name
-
-  if (!isSimpleSkillName(targetName)) {
-    throw new Error(
-      `Invalid skill name "${targetName}". Use letters, numbers, ".", "_" or "-".`,
-    )
-  }
-
-  const targetPath = path.join(targetRoot, targetName)
-  const sourceSkillFile = path.join(resolved.sourcePath, 'SKILL.md')
-  const targetSkillFile = path.join(targetPath, 'SKILL.md')
-
-  await fs.access(sourceSkillFile)
-  await fs.mkdir(targetRoot, { recursive: true })
-
-  let exists = false
-  try {
-    await fs.access(targetSkillFile)
-    exists = true
-  } catch {
-    exists = false
-  }
-  if (exists) {
-    if (!force) {
-      throw new Error(
-        `Skill already exists at ${targetPath}. Re-run with --force to overwrite.`,
-      )
-    }
-    await fs.rm(targetPath, { recursive: true, force: true })
-  }
-
-  await fs.cp(resolved.sourcePath, targetPath, { recursive: true })
-
-  return {
-    ok: true,
-    installed: targetName,
-    targetPath,
-    sourceType: resolved.type,
-    sourcePath: resolved.sourcePath,
-    codexSkillsDir: targetRoot,
-  }
-}
-
 function permissionOf(namespace) {
   return PRIVACY_PERMISSION_BY_NAMESPACE[namespace]
 }
@@ -629,7 +516,6 @@ program
   })
 
 const daemon = program.command('daemon').description('Manage local browser bridge daemon')
-const skills = program.command('skills').description('Manage extension-cli skills for Codex/Claude-style setup')
 
 daemon.command('status').action(async () => {
   try {
@@ -657,45 +543,6 @@ daemon.command('stop').action(async () => {
     process.exit(1)
   }
 })
-
-skills
-  .command('list')
-  .description('List built-in skills bundled with this package')
-  .action(async () => {
-    try {
-      const names = await listBuiltinSkills()
-      printResult({
-        count: names.length,
-        skills: names,
-        sourceDir: BUILTIN_SKILLS_DIR,
-      })
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
-      process.exit(1)
-    }
-  })
-
-skills
-  .command('install')
-  .description('Install a skill to CODEX_HOME/skills (default: ~/.codex/skills)')
-  .argument('<source>', 'Built-in name (e.g. extension-cli) or local skill directory path')
-  .option('--name <name>', 'Install as a custom skill name')
-  .option('--dir <path>', 'Target skills directory (overrides CODEX_HOME/skills)')
-  .option('--force', 'Overwrite target if it already exists')
-  .action(async (source, options) => {
-    try {
-      const result = await installSkill({
-        source,
-        name: options.name,
-        dir: options.dir,
-        force: !!options.force,
-      })
-      printResult(result)
-    } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
-      process.exit(1)
-    }
-  })
 
 async function loadFtMetrics() {
   await requireOptionalPermission('bookmarks')

@@ -20,12 +20,6 @@ npx @extension-cli/cli --help
 
 Note: the executable command is still `extension-cli`.
 
-## Skill Install (One Command)
-
-```bash
-npx @extension-cli/cli@latest skills install extension-cli
-```
-
 ## Project Governance
 
 - Contributing guide: `CONTRIBUTING.md`
@@ -100,9 +94,6 @@ extension-cli status [--verify-rendering-token]
 extension-cli daemon status
 extension-cli daemon start
 extension-cli daemon stop
-
-extension-cli skills list
-extension-cli skills install extension-cli
 ```
 
 ### Tabs (`chrome.tabs`)
