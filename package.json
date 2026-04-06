@@ -1,6 +1,6 @@
 {
   "name": "@extension-cli/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A skill-first browser extension CLI for AI agents on Chrome, Firefox, and Edge.",
   "license": "MIT",
   "repository": {
@@ -40,7 +40,8 @@
     "test:sessions": "pnpm exec vitest run src/browser/sessions-methods.test.mjs",
     "test:bookmarks": "pnpm exec vitest run src/browser/bookmarks-methods.test.mjs",
     "test:browser-api": "pnpm run test:tabs && pnpm run test:tab-groups && pnpm run test:windows && pnpm run test:history && pnpm run test:sessions && pnpm run test:bookmarks",
-    "prepack": "CI=true pnpm --dir extension install --no-frozen-lockfile && cd extension && pnpm run build"
+    "prepack": "CI=true pnpm --dir extension install --no-frozen-lockfile && cd extension && pnpm run build",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0"
   },
   "publishConfig": {
     "access": "public"
