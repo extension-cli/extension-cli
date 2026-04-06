@@ -49,6 +49,8 @@ flowchart LR
 
 ## Install
 
+### CLI Install
+
 ```bash
 pnpm i -g @extension-cli/cli
 ```
@@ -57,6 +59,12 @@ Or run directly without global install:
 
 ```bash
 npx @extension-cli/cli --help
+```
+
+## Skill Install by npx skills
+
+```bash
+npx skills add extension-cli/extension-cli --skill extension-cli
 ```
 
 Note: the executable command is still `extension-cli`.
