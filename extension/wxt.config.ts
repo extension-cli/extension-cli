@@ -22,7 +22,7 @@ export default defineConfig({
     },
   }),
   manifest: {
-    name: "extension-cli",
+    name: "Extension CLI",
     description:
       "Browser automation bridge for extension-cli. Executes commands in isolated Chrome windows via a local daemon.",
     permissions: [

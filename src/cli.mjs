@@ -65,6 +65,17 @@ function printResult(result) {
   console.log(JSON.stringify(result, null, 2))
 }
 
+function toKebabCase(value) {
+  return String(value)
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[_\s]+/g, '-')
+    .toLowerCase()
+}
+
+function formatMethodNames(names) {
+  return names.map(toKebabCase)
+}
+
 function parseBooleanOption(value, optionName) {
   if (value === undefined || value === null || value === '') return true
   const normalized = String(value).trim().toLowerCase()
@@ -944,7 +955,7 @@ browserTabs
   .command('methods')
   .description('List all integrated chrome.tabs methods')
   .action(() => {
-    printResult({ count: TABS_METHOD_NAMES.length, methods: TABS_METHOD_NAMES })
+    printResult({ count: TABS_METHOD_NAMES.length, methods: formatMethodNames(TABS_METHOD_NAMES) })
   })
 
 browserTabs
@@ -1062,7 +1073,7 @@ browserTabGroups
   .command('methods')
   .description('List all integrated chrome.tabGroups methods')
   .action(() => {
-    printResult({ count: TAB_GROUPS_METHOD_NAMES.length, methods: TAB_GROUPS_METHOD_NAMES })
+    printResult({ count: TAB_GROUPS_METHOD_NAMES.length, methods: formatMethodNames(TAB_GROUPS_METHOD_NAMES) })
   })
 
 browserTabGroups
@@ -1206,7 +1217,7 @@ browserWindows
   .command('methods')
   .description('List all integrated chrome.windows methods')
   .action(() => {
-    printResult({ count: WINDOWS_METHOD_NAMES.length, methods: WINDOWS_METHOD_NAMES })
+    printResult({ count: WINDOWS_METHOD_NAMES.length, methods: formatMethodNames(WINDOWS_METHOD_NAMES) })
   })
 
 browserWindows
@@ -1411,7 +1422,7 @@ browserHistory
   .command('methods')
   .description('List all integrated chrome.history methods')
   .action(() => {
-    printResult({ count: HISTORY_METHOD_NAMES.length, methods: HISTORY_METHOD_NAMES })
+    printResult({ count: HISTORY_METHOD_NAMES.length, methods: formatMethodNames(HISTORY_METHOD_NAMES) })
   })
 
 browserHistory
@@ -1597,7 +1608,7 @@ browserSessions
   .command('methods')
   .description('List all integrated chrome.sessions methods')
   .action(() => {
-    printResult({ count: SESSIONS_METHOD_NAMES.length, methods: SESSIONS_METHOD_NAMES })
+    printResult({ count: SESSIONS_METHOD_NAMES.length, methods: formatMethodNames(SESSIONS_METHOD_NAMES) })
   })
 
 browserSessions
@@ -1834,7 +1845,7 @@ browserBookmarks
   .command('methods')
   .description('List all integrated chrome.bookmarks methods')
   .action(() => {
-    printResult({ count: BOOKMARKS_METHOD_NAMES.length, methods: BOOKMARKS_METHOD_NAMES })
+    printResult({ count: BOOKMARKS_METHOD_NAMES.length, methods: formatMethodNames(BOOKMARKS_METHOD_NAMES) })
   })
 
 browserBookmarks

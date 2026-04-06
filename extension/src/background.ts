@@ -106,6 +106,62 @@ let bookmarksEventsLastEmitAt: number | null = null;
 let permissionsEventsEmitCount = 0;
 let permissionsEventsLastEmitAt: number | null = null;
 
+function markBridgeUnavailable(
+  statusMap: Record<string, BridgeEventStatus>,
+  names: readonly string[],
+  reason: string,
+): void {
+  for (const name of names) {
+    const state = statusMap[name] || { name, available: false, registered: false };
+    state.available = false;
+    state.registered = false;
+    state.error = reason;
+    statusMap[name] = state;
+  }
+}
+
+const historyBridgeHandlers = {
+  onVisited: (result: chrome.history.HistoryItem) => {
+    emitEvent('history', 'onVisited', { result });
+  },
+  onVisitRemoved: (removed: chrome.history.RemoveVisitsResult) => {
+    emitEvent('history', 'onVisitRemoved', { removed });
+  },
+};
+
+const sessionsBridgeHandlers = {
+  onChanged: () => {
+    emitEvent('sessions', 'onChanged', {});
+  },
+};
+
+const bookmarksBridgeHandlers = {
+  onCreated: (id: string, bookmark: chrome.bookmarks.BookmarkTreeNode) => {
+    emitEvent('bookmarks', 'onCreated', { id, bookmark });
+  },
+  onRemoved: (id: string, removeInfo: chrome.bookmarks.RemoveInfo) => {
+    emitEvent('bookmarks', 'onRemoved', { id, removeInfo });
+  },
+  onChanged: (id: string, changeInfo: chrome.bookmarks.ChangeInfo) => {
+    emitEvent('bookmarks', 'onChanged', { id, changeInfo });
+  },
+  onMoved: (id: string, moveInfo: chrome.bookmarks.MoveInfo) => {
+    emitEvent('bookmarks', 'onMoved', { id, moveInfo });
+  },
+  onChildrenReordered: (
+    id: string,
+    reorderInfo: chrome.bookmarks.ReorderInfo,
+  ) => {
+    emitEvent('bookmarks', 'onChildrenReordered', { id, reorderInfo });
+  },
+  onImportBegan: () => {
+    emitEvent('bookmarks', 'onImportBegan', {});
+  },
+  onImportEnded: () => {
+    emitEvent('bookmarks', 'onImportEnded', {});
+  },
+};
+
 function emitEvent(namespace: string, name: string, payload: unknown): void {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   try {
@@ -360,6 +416,38 @@ chrome.windows.onRemoved.addListener((windowId) => {
 
 let initialized = false;
 
+async function refreshOptionalPermissionEventBridges(): Promise<void> {
+  const hasOptionalPermission = async (permission: 'history' | 'sessions' | 'bookmarks') => {
+    try {
+      const granted = await chrome.permissions.contains({ permissions: [permission] });
+      return Boolean(granted);
+    } catch {
+      return false;
+    }
+  };
+
+  const historyGranted = await hasOptionalPermission('history');
+  if (historyGranted) {
+    registerHistoryEventBridge();
+  } else {
+    markBridgeUnavailable(historyEventStatus, HISTORY_EVENT_NAMES, 'Optional permission not granted');
+  }
+
+  const sessionsGranted = await hasOptionalPermission('sessions');
+  if (sessionsGranted) {
+    registerSessionsEventBridge();
+  } else {
+    markBridgeUnavailable(sessionsEventStatus, SESSIONS_EVENT_NAMES, 'Optional permission not granted');
+  }
+
+  const bookmarksGranted = await hasOptionalPermission('bookmarks');
+  if (bookmarksGranted) {
+    registerBookmarksEventBridge();
+  } else {
+    markBridgeUnavailable(bookmarksEventStatus, BOOKMARKS_EVENT_NAMES, 'Optional permission not granted');
+  }
+}
+
 function initialize(): void {
   if (initialized) return;
   initialized = true;
@@ -368,9 +456,7 @@ function initialize(): void {
   registerTabsEventBridge();
   registerTabGroupsEventBridge();
   registerWindowsEventBridge();
-  registerHistoryEventBridge();
-  registerSessionsEventBridge();
-  registerBookmarksEventBridge();
+  void refreshOptionalPermissionEventBridges();
   registerPermissionsEventBridge();
   void connect();
   console.log('[extension-cli] extension-cli extension initialized');
@@ -570,6 +656,11 @@ function registerHistoryEventBridge(): void {
     state.error = undefined;
 
     try {
+      if (typeof event.hasListener === 'function' && event.hasListener(handler)) {
+        state.registered = true;
+        historyEventStatus[name] = state;
+        return;
+      }
       event.addListener(handler);
       state.registered = true;
       historyEventStatus[name] = state;
@@ -581,12 +672,8 @@ function registerHistoryEventBridge(): void {
     }
   };
 
-  safeAdd(chrome.history?.onVisited, 'onVisited', (result) => {
-    emitEvent('history', 'onVisited', { result });
-  });
-  safeAdd(chrome.history?.onVisitRemoved, 'onVisitRemoved', (removed) => {
-    emitEvent('history', 'onVisitRemoved', { removed });
-  });
+  safeAdd(chrome.history?.onVisited, 'onVisited', historyBridgeHandlers.onVisited);
+  safeAdd(chrome.history?.onVisitRemoved, 'onVisitRemoved', historyBridgeHandlers.onVisitRemoved);
 }
 
 function registerSessionsEventBridge(): void {
@@ -610,6 +697,11 @@ function registerSessionsEventBridge(): void {
     state.error = undefined;
 
     try {
+      if (typeof event.hasListener === 'function' && event.hasListener(handler)) {
+        state.registered = true;
+        sessionsEventStatus[name] = state;
+        return;
+      }
       event.addListener(handler);
       state.registered = true;
       sessionsEventStatus[name] = state;
@@ -621,9 +713,7 @@ function registerSessionsEventBridge(): void {
     }
   };
 
-  safeAdd(chrome.sessions?.onChanged, 'onChanged', () => {
-    emitEvent('sessions', 'onChanged', {});
-  });
+  safeAdd(chrome.sessions?.onChanged, 'onChanged', sessionsBridgeHandlers.onChanged);
 }
 
 function registerBookmarksEventBridge(): void {
@@ -647,6 +737,11 @@ function registerBookmarksEventBridge(): void {
     state.error = undefined;
 
     try {
+      if (typeof event.hasListener === 'function' && event.hasListener(handler)) {
+        state.registered = true;
+        bookmarksEventStatus[name] = state;
+        return;
+      }
       event.addListener(handler);
       state.registered = true;
       bookmarksEventStatus[name] = state;
@@ -658,27 +753,17 @@ function registerBookmarksEventBridge(): void {
     }
   };
 
-  safeAdd(chrome.bookmarks?.onCreated, 'onCreated', (id, bookmark) => {
-    emitEvent('bookmarks', 'onCreated', { id, bookmark });
-  });
-  safeAdd(chrome.bookmarks?.onRemoved, 'onRemoved', (id, removeInfo) => {
-    emitEvent('bookmarks', 'onRemoved', { id, removeInfo });
-  });
-  safeAdd(chrome.bookmarks?.onChanged, 'onChanged', (id, changeInfo) => {
-    emitEvent('bookmarks', 'onChanged', { id, changeInfo });
-  });
-  safeAdd(chrome.bookmarks?.onMoved, 'onMoved', (id, moveInfo) => {
-    emitEvent('bookmarks', 'onMoved', { id, moveInfo });
-  });
-  safeAdd(chrome.bookmarks?.onChildrenReordered, 'onChildrenReordered', (id, reorderInfo) => {
-    emitEvent('bookmarks', 'onChildrenReordered', { id, reorderInfo });
-  });
-  safeAdd(chrome.bookmarks?.onImportBegan, 'onImportBegan', () => {
-    emitEvent('bookmarks', 'onImportBegan', {});
-  });
-  safeAdd(chrome.bookmarks?.onImportEnded, 'onImportEnded', () => {
-    emitEvent('bookmarks', 'onImportEnded', {});
-  });
+  safeAdd(chrome.bookmarks?.onCreated, 'onCreated', bookmarksBridgeHandlers.onCreated);
+  safeAdd(chrome.bookmarks?.onRemoved, 'onRemoved', bookmarksBridgeHandlers.onRemoved);
+  safeAdd(chrome.bookmarks?.onChanged, 'onChanged', bookmarksBridgeHandlers.onChanged);
+  safeAdd(chrome.bookmarks?.onMoved, 'onMoved', bookmarksBridgeHandlers.onMoved);
+  safeAdd(
+    chrome.bookmarks?.onChildrenReordered,
+    'onChildrenReordered',
+    bookmarksBridgeHandlers.onChildrenReordered,
+  );
+  safeAdd(chrome.bookmarks?.onImportBegan, 'onImportBegan', bookmarksBridgeHandlers.onImportBegan);
+  safeAdd(chrome.bookmarks?.onImportEnded, 'onImportEnded', bookmarksBridgeHandlers.onImportEnded);
 }
 
 function registerPermissionsEventBridge(): void {
@@ -714,9 +799,11 @@ function registerPermissionsEventBridge(): void {
   };
 
   safeAdd(chrome.permissions?.onAdded, 'onAdded', (permissions) => {
+    void refreshOptionalPermissionEventBridges();
     emitEvent('permissions', 'onAdded', { permissions: toJsonSafe(permissions) });
   });
   safeAdd(chrome.permissions?.onRemoved, 'onRemoved', (permissions) => {
+    void refreshOptionalPermissionEventBridges();
     emitEvent('permissions', 'onRemoved', { permissions: toJsonSafe(permissions) });
   });
 }

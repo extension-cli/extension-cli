@@ -41,6 +41,8 @@ type PermissionBadge =
 
 const PERMISSIONS: PermissionName[] = ["bookmarks", "history", "sessions"];
 const DOCS_URL = "https://github.com/extension-cli/extension-cli";
+const SKILL_INSTALL_URL =
+  "https://github.com/extension-cli/extension-cli#skill-install-one-command";
 const DEFAULT_ENDPOINT = "ws://127.0.0.1:19883/ext";
 
 function asNumber(value: unknown, fallback = 0): number {
@@ -121,8 +123,13 @@ function PopupApp() {
     sessions: "Checking",
   });
 
+  async function refreshStatus() {
+    const status = await queryStatus();
+    setPopupStatus(status);
+  }
+
   useEffect(() => {
-    void queryStatus().then(setPopupStatus);
+    void refreshStatus();
   }, []);
 
   useEffect(() => {
@@ -202,6 +209,7 @@ function PopupApp() {
         ...prev,
         [permission]: granted ? "Granted" : "Denied",
       }));
+      await refreshStatus();
     } catch {
       setPermissionState((prev) => ({ ...prev, [permission]: "Error" }));
     }
@@ -216,6 +224,7 @@ function PopupApp() {
         ...prev,
         [permission]: granted ? "Granted" : "Not granted",
       }));
+      await refreshStatus();
     } catch {
       setPermissionState((prev) => ({ ...prev, [permission]: "Error" }));
     }
@@ -244,7 +253,7 @@ function PopupApp() {
     <main className="popup">
       <header className="header">
         <img src="/icons/icon-48.png" alt="extension-cli" />
-        <h1>extension-cli</h1>
+        <h1>Extension CLI</h1>
       </header>
 
       <section className="status-row">
@@ -362,6 +371,10 @@ function PopupApp() {
       <footer className="footer">
         <a href={DOCS_URL} target="_blank" rel="noreferrer">
           Documentation
+        </a>
+        {" · "}
+        <a href={SKILL_INSTALL_URL} target="_blank" rel="noreferrer">
+          Install Skills
         </a>
       </footer>
     </main>
