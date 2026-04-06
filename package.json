@@ -1,6 +1,6 @@
 {
   "name": "@extension-cli/cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A skill-first browser extension CLI for AI agents on Chrome, Firefox, and Edge.",
   "license": "MIT",
   "repository": {

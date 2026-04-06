@@ -1,3 +1,13 @@
+## [0.1.2](https://github.com/extension-cli/extension-cli/compare/v0.1.1...v0.1.2) (2026-04-06)
+
+
+### Features
+
+* remove the skills command ([17a1240](https://github.com/extension-cli/extension-cli/commit/17a1240094ad5c0b1a476ac13296d6137dc99127))
+* update README.md ([969c691](https://github.com/extension-cli/extension-cli/commit/969c691c7593ce57a98bfab330ab26cc7b75f1fc))
+
+
+
 ## [0.1.1](https://github.com/extension-cli/extension-cli/compare/v0.1.0...v0.1.1) (2026-04-06)
 
 
