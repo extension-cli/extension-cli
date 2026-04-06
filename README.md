@@ -1,10 +1,51 @@
-# extension-cli
+# Extension CLI
 
-`browser + rendering` automation CLI.
+A skill-first browser extension CLI for AI agents on Chrome, Firefox, and Edge.
 
-- CLI -> local daemon (`127.0.0.1:19883`)
-- daemon -> Chrome extension (WebSocket `/ext`)
-- extension -> Chrome APIs (`chrome.tabs.*`, `chrome.debugger.*`, `chrome.cookies.*`)
+## Why Extension CLI?
+
+- Agent-first browser automation with predictable CLI primitives.
+- Works with real browser state (tabs, windows, history, sessions, bookmarks).
+- Safer defaults for destructive operations via human-in-the-loop confirmation.
+- Built for local workflows: fast iteration, explicit outputs, easy scripting.
+
+## How it works
+
+```mermaid
+flowchart LR
+  A["AI Agent / User"] --> B["extension-cli (CLI)"]
+  B --> C["Local Daemon (127.0.0.1:19883)"]
+  C --> D["Browser Extension (WebSocket /ext)"]
+  D --> E["Chrome APIs (tabs/windows/history/sessions/bookmarks/debugger/cookies)"]
+  E --> D
+  D --> C
+  C --> B
+  B --> F["Structured JSON Output"]
+```
+
+1. `extension-cli` sends commands to a local daemon.
+2. Daemon talks to the browser extension through WebSocket.
+3. Extension executes Chrome APIs and returns structured results.
+4. CLI prints JSON-friendly output for humans and AI agents.
+
+## Features
+
+- Unified browser API surface: `tabs`, `tab-groups`, `windows`, `history`, `sessions`, `bookmarks`.
+- Event bridge support (`events`, `events-clear`, `--follow`) for runtime observability.
+- Cloudflare Browser Rendering integration (`rendering` namespace).
+- Risk controls for delete/remove operations:
+  - interactive `YES/NO` confirmation
+  - target tab preview (`tabs remove`: `tabId`, `title`, `url`)
+  - machine-readable safety error (`SAFETY_CONFIRMATION_REQUIRED`)
+  - non-interactive explicit ack (`--yes --risk-ack ...`)
+
+## Agent Prompt Examples
+
+- Group browser tabs into meaningful categories in current window.
+- Find inactive tabs in the current window and close the ones older than 7 days.
+- Summarize top domains from recent history and output JSON.
+- Move all tabs from social media domains into a new tab group named `Later`.
+- Export bookmark tree stats, then suggest cleanup candidates with duplicated titles.
 
 ## Install
 
