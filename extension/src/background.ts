@@ -70,6 +70,26 @@ const PERMISSIONS_EVENT_NAMES = [
   'onRemoved',
 ] as const;
 
+const COOKIES_EVENT_NAMES = [
+  'onChanged',
+] as const;
+
+const DOWNLOADS_EVENT_NAMES = [
+  'onCreated',
+  'onChanged',
+  'onErased',
+] as const;
+
+const STORAGE_EVENT_NAMES = [
+  'onChanged',
+] as const;
+
+const READING_LIST_EVENT_NAMES = [
+  'onEntryAdded',
+  'onEntryRemoved',
+  'onEntryUpdated',
+] as const;
+
 function createStatusMap(names: readonly string[]): Record<string, BridgeEventStatus> {
   return Object.fromEntries(
     names.map((name) => [
@@ -90,6 +110,10 @@ const historyEventStatus: Record<string, BridgeEventStatus> = createStatusMap([.
 const sessionsEventStatus: Record<string, BridgeEventStatus> = createStatusMap([...SESSIONS_EVENT_NAMES]);
 const bookmarksEventStatus: Record<string, BridgeEventStatus> = createStatusMap([...BOOKMARKS_EVENT_NAMES]);
 const permissionsEventStatus: Record<string, BridgeEventStatus> = createStatusMap([...PERMISSIONS_EVENT_NAMES]);
+const cookiesEventStatus: Record<string, BridgeEventStatus> = createStatusMap([...COOKIES_EVENT_NAMES]);
+const downloadsEventStatus: Record<string, BridgeEventStatus> = createStatusMap([...DOWNLOADS_EVENT_NAMES]);
+const storageEventStatus: Record<string, BridgeEventStatus> = createStatusMap([...STORAGE_EVENT_NAMES]);
+const readingListEventStatus: Record<string, BridgeEventStatus> = createStatusMap([...READING_LIST_EVENT_NAMES]);
 
 let tabsEventsEmitCount = 0;
 let tabsEventsLastEmitAt: number | null = null;
@@ -105,6 +129,14 @@ let bookmarksEventsEmitCount = 0;
 let bookmarksEventsLastEmitAt: number | null = null;
 let permissionsEventsEmitCount = 0;
 let permissionsEventsLastEmitAt: number | null = null;
+let cookiesEventsEmitCount = 0;
+let cookiesEventsLastEmitAt: number | null = null;
+let downloadsEventsEmitCount = 0;
+let downloadsEventsLastEmitAt: number | null = null;
+let storageEventsEmitCount = 0;
+let storageEventsLastEmitAt: number | null = null;
+let readingListEventsEmitCount = 0;
+let readingListEventsLastEmitAt: number | null = null;
 
 function markBridgeUnavailable(
   statusMap: Record<string, BridgeEventStatus>,
@@ -162,6 +194,42 @@ const bookmarksBridgeHandlers = {
   },
 };
 
+const cookiesBridgeHandlers = {
+  onChanged: (changeInfo: unknown) => {
+    emitEvent('cookies', 'onChanged', { changeInfo: toJsonSafe(changeInfo) });
+  },
+};
+
+const downloadsBridgeHandlers = {
+  onCreated: (downloadItem: unknown) => {
+    emitEvent('downloads', 'onCreated', { downloadItem: toJsonSafe(downloadItem) });
+  },
+  onChanged: (downloadDelta: unknown) => {
+    emitEvent('downloads', 'onChanged', { downloadDelta: toJsonSafe(downloadDelta) });
+  },
+  onErased: (downloadId: number) => {
+    emitEvent('downloads', 'onErased', { downloadId });
+  },
+};
+
+const storageBridgeHandlers = {
+  onChanged: (changes: unknown, areaName: string) => {
+    emitEvent('storage', 'onChanged', { changes: toJsonSafe(changes), areaName });
+  },
+};
+
+const readingListBridgeHandlers = {
+  onEntryAdded: (entry: unknown) => {
+    emitEvent('readingList', 'onEntryAdded', { entry: toJsonSafe(entry) });
+  },
+  onEntryRemoved: (entry: unknown) => {
+    emitEvent('readingList', 'onEntryRemoved', { entry: toJsonSafe(entry) });
+  },
+  onEntryUpdated: (entry: unknown) => {
+    emitEvent('readingList', 'onEntryUpdated', { entry: toJsonSafe(entry) });
+  },
+};
+
 function emitEvent(namespace: string, name: string, payload: unknown): void {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   try {
@@ -187,6 +255,18 @@ function emitEvent(namespace: string, name: string, payload: unknown): void {
     } else if (namespace === 'permissions') {
       permissionsEventsEmitCount += 1;
       permissionsEventsLastEmitAt = now;
+    } else if (namespace === 'cookies') {
+      cookiesEventsEmitCount += 1;
+      cookiesEventsLastEmitAt = now;
+    } else if (namespace === 'downloads') {
+      downloadsEventsEmitCount += 1;
+      downloadsEventsLastEmitAt = now;
+    } else if (namespace === 'storage') {
+      storageEventsEmitCount += 1;
+      storageEventsLastEmitAt = now;
+    } else if (namespace === 'readingList') {
+      readingListEventsEmitCount += 1;
+      readingListEventsLastEmitAt = now;
     }
     ws.send(JSON.stringify({
       type: 'event',
@@ -458,6 +538,10 @@ function initialize(): void {
   registerWindowsEventBridge();
   void refreshOptionalPermissionEventBridges();
   registerPermissionsEventBridge();
+  registerCookiesEventBridge();
+  registerDownloadsEventBridge();
+  registerStorageEventBridge();
+  registerReadingListEventBridge();
   void connect();
   console.log('[extension-cli] extension-cli extension initialized');
 }
@@ -808,6 +892,171 @@ function registerPermissionsEventBridge(): void {
   });
 }
 
+function registerCookiesEventBridge(): void {
+  const safeAdd = (
+    event: chrome.events.Event<(...args: any[]) => void> | undefined,
+    name: string,
+    handler: (...args: any[]) => void,
+  ) => {
+    const state = cookiesEventStatus[name] || { name, available: false, registered: false };
+
+    if (!event || typeof event.addListener !== 'function') {
+      state.available = false;
+      state.registered = false;
+      state.error = 'Event unavailable in this runtime';
+      cookiesEventStatus[name] = state;
+      console.warn(`[extension-cli] cookies event unavailable: ${name}`);
+      return;
+    }
+
+    state.available = true;
+    state.error = undefined;
+
+    try {
+      if (typeof event.hasListener === 'function' && event.hasListener(handler)) {
+        state.registered = true;
+        cookiesEventStatus[name] = state;
+        return;
+      }
+      event.addListener(handler);
+      state.registered = true;
+      cookiesEventStatus[name] = state;
+    } catch (error) {
+      state.registered = false;
+      state.error = error instanceof Error ? error.message : String(error);
+      cookiesEventStatus[name] = state;
+      console.warn(`[extension-cli] failed to register cookies event ${name}:`, error);
+    }
+  };
+
+  safeAdd(chrome.cookies?.onChanged as any, 'onChanged', cookiesBridgeHandlers.onChanged);
+}
+
+function registerDownloadsEventBridge(): void {
+  const safeAdd = (
+    event: chrome.events.Event<(...args: any[]) => void> | undefined,
+    name: string,
+    handler: (...args: any[]) => void,
+  ) => {
+    const state = downloadsEventStatus[name] || { name, available: false, registered: false };
+
+    if (!event || typeof event.addListener !== 'function') {
+      state.available = false;
+      state.registered = false;
+      state.error = 'Event unavailable in this runtime';
+      downloadsEventStatus[name] = state;
+      console.warn(`[extension-cli] downloads event unavailable: ${name}`);
+      return;
+    }
+
+    state.available = true;
+    state.error = undefined;
+
+    try {
+      if (typeof event.hasListener === 'function' && event.hasListener(handler)) {
+        state.registered = true;
+        downloadsEventStatus[name] = state;
+        return;
+      }
+      event.addListener(handler);
+      state.registered = true;
+      downloadsEventStatus[name] = state;
+    } catch (error) {
+      state.registered = false;
+      state.error = error instanceof Error ? error.message : String(error);
+      downloadsEventStatus[name] = state;
+      console.warn(`[extension-cli] failed to register downloads event ${name}:`, error);
+    }
+  };
+
+  safeAdd(chrome.downloads?.onCreated as any, 'onCreated', downloadsBridgeHandlers.onCreated);
+  safeAdd(chrome.downloads?.onChanged as any, 'onChanged', downloadsBridgeHandlers.onChanged);
+  safeAdd(chrome.downloads?.onErased as any, 'onErased', downloadsBridgeHandlers.onErased);
+}
+
+function registerStorageEventBridge(): void {
+  const safeAdd = (
+    event: chrome.events.Event<(...args: any[]) => void> | undefined,
+    name: string,
+    handler: (...args: any[]) => void,
+  ) => {
+    const state = storageEventStatus[name] || { name, available: false, registered: false };
+
+    if (!event || typeof event.addListener !== 'function') {
+      state.available = false;
+      state.registered = false;
+      state.error = 'Event unavailable in this runtime';
+      storageEventStatus[name] = state;
+      console.warn(`[extension-cli] storage event unavailable: ${name}`);
+      return;
+    }
+
+    state.available = true;
+    state.error = undefined;
+
+    try {
+      if (typeof event.hasListener === 'function' && event.hasListener(handler)) {
+        state.registered = true;
+        storageEventStatus[name] = state;
+        return;
+      }
+      event.addListener(handler);
+      state.registered = true;
+      storageEventStatus[name] = state;
+    } catch (error) {
+      state.registered = false;
+      state.error = error instanceof Error ? error.message : String(error);
+      storageEventStatus[name] = state;
+      console.warn(`[extension-cli] failed to register storage event ${name}:`, error);
+    }
+  };
+
+  safeAdd(chrome.storage?.onChanged as any, 'onChanged', storageBridgeHandlers.onChanged);
+}
+
+function registerReadingListEventBridge(): void {
+  const safeAdd = (
+    event: chrome.events.Event<(...args: any[]) => void> | undefined,
+    name: string,
+    handler: (...args: any[]) => void,
+  ) => {
+    const state = readingListEventStatus[name] || { name, available: false, registered: false };
+
+    if (!event || typeof event.addListener !== 'function') {
+      state.available = false;
+      state.registered = false;
+      state.error = 'Event unavailable in this runtime';
+      readingListEventStatus[name] = state;
+      console.warn(`[extension-cli] readingList event unavailable: ${name}`);
+      return;
+    }
+
+    state.available = true;
+    state.error = undefined;
+
+    try {
+      if (typeof event.hasListener === 'function' && event.hasListener(handler)) {
+        state.registered = true;
+        readingListEventStatus[name] = state;
+        return;
+      }
+      event.addListener(handler);
+      state.registered = true;
+      readingListEventStatus[name] = state;
+    } catch (error) {
+      state.registered = false;
+      state.error = error instanceof Error ? error.message : String(error);
+      readingListEventStatus[name] = state;
+      console.warn(`[extension-cli] failed to register readingList event ${name}:`, error);
+    }
+  };
+
+  const readingListApi = (chrome as unknown as Record<string, any>).readingList;
+  safeAdd(readingListApi?.onEntryAdded, 'onEntryAdded', readingListBridgeHandlers.onEntryAdded);
+  safeAdd(readingListApi?.onEntryRemoved, 'onEntryRemoved', readingListBridgeHandlers.onEntryRemoved);
+  safeAdd(readingListApi?.onEntryUpdated, 'onEntryUpdated', readingListBridgeHandlers.onEntryUpdated);
+}
+
 // ─── Popup status API ───────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -833,6 +1082,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const permissionsValues = Object.values(permissionsEventStatus);
     const permissionsRegistered = permissionsValues.filter(item => item.registered).length;
     const permissionsAvailable = permissionsValues.filter(item => item.available).length;
+    const cookiesValues = Object.values(cookiesEventStatus);
+    const cookiesRegistered = cookiesValues.filter(item => item.registered).length;
+    const cookiesAvailable = cookiesValues.filter(item => item.available).length;
+    const downloadsValues = Object.values(downloadsEventStatus);
+    const downloadsRegistered = downloadsValues.filter(item => item.registered).length;
+    const downloadsAvailable = downloadsValues.filter(item => item.available).length;
+    const storageValues = Object.values(storageEventStatus);
+    const storageRegistered = storageValues.filter(item => item.registered).length;
+    const storageAvailable = storageValues.filter(item => item.available).length;
+    const readingListValues = Object.values(readingListEventStatus);
+    const readingListRegistered = readingListValues.filter(item => item.registered).length;
+    const readingListAvailable = readingListValues.filter(item => item.available).length;
     sendResponse({
       connected: ws?.readyState === WebSocket.OPEN,
       reconnecting: reconnectTimer !== null,
@@ -905,6 +1166,42 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           lastEmittedAt: permissionsEventsLastEmitAt,
           events: permissionsValues,
         },
+        cookiesEvents: {
+          enabled: true,
+          total: cookiesValues.length,
+          available: cookiesAvailable,
+          registered: cookiesRegistered,
+          emittedCount: cookiesEventsEmitCount,
+          lastEmittedAt: cookiesEventsLastEmitAt,
+          events: cookiesValues,
+        },
+        downloadsEvents: {
+          enabled: true,
+          total: downloadsValues.length,
+          available: downloadsAvailable,
+          registered: downloadsRegistered,
+          emittedCount: downloadsEventsEmitCount,
+          lastEmittedAt: downloadsEventsLastEmitAt,
+          events: downloadsValues,
+        },
+        storageEvents: {
+          enabled: true,
+          total: storageValues.length,
+          available: storageAvailable,
+          registered: storageRegistered,
+          emittedCount: storageEventsEmitCount,
+          lastEmittedAt: storageEventsLastEmitAt,
+          events: storageValues,
+        },
+        readingListEvents: {
+          enabled: true,
+          total: readingListValues.length,
+          available: readingListAvailable,
+          registered: readingListRegistered,
+          emittedCount: readingListEventsEmitCount,
+          lastEmittedAt: readingListEventsLastEmitAt,
+          events: readingListValues,
+        },
       },
     });
   }
@@ -933,6 +1230,16 @@ async function handleCommand(cmd: Command): Promise<Result> {
         return await handleSessionsMethodApi(cmd);
       case 'bookmarks-method':
         return await handleBookmarksMethod(cmd);
+      case 'cookies-method':
+        return await handleCookiesMethod(cmd);
+      case 'downloads-method':
+        return await handleDownloadsMethod(cmd);
+      case 'storage-method':
+        return await handleStorageMethod(cmd);
+      case 'reading-list-method':
+        return await handleReadingListMethod(cmd);
+      case 'top-sites-method':
+        return await handleTopSitesMethod(cmd);
       case 'permissions-method':
         return await handlePermissionsMethod(cmd);
       case 'cookies':
@@ -1409,6 +1716,60 @@ const BOOKMARKS_METHOD_ALLOWLIST = new Set([
   'update',
 ]);
 
+const COOKIES_METHOD_ALLOWLIST = new Set([
+  'get',
+  'getAll',
+  'getAllCookieStores',
+  'remove',
+  'set',
+]);
+
+const DOWNLOADS_METHOD_ALLOWLIST = new Set([
+  'acceptDanger',
+  'cancel',
+  'download',
+  'erase',
+  'getFileIcon',
+  'open',
+  'pause',
+  'removeFile',
+  'resume',
+  'search',
+  'show',
+  'showDefaultFolder',
+]);
+
+const STORAGE_METHOD_ALLOWLIST = new Set([
+  'local.clear',
+  'local.get',
+  'local.getBytesInUse',
+  'local.remove',
+  'local.set',
+  'managed.get',
+  'managed.getBytesInUse',
+  'session.clear',
+  'session.get',
+  'session.getBytesInUse',
+  'session.remove',
+  'session.set',
+  'sync.clear',
+  'sync.get',
+  'sync.getBytesInUse',
+  'sync.remove',
+  'sync.set',
+]);
+
+const READING_LIST_METHOD_ALLOWLIST = new Set([
+  'addEntry',
+  'query',
+  'removeEntry',
+  'updateEntry',
+]);
+
+const TOP_SITES_METHOD_ALLOWLIST = new Set([
+  'get',
+]);
+
 function toJsonSafe(value: unknown, seen = new WeakSet<object>()): unknown {
   if (value === null || value === undefined) return value;
   const t = typeof value;
@@ -1553,10 +1914,133 @@ async function handleBookmarksMethod(cmd: Command): Promise<Result> {
   return { id: cmd.id, ok: true, data: toJsonSafe(data) };
 }
 
+async function handleCookiesMethod(cmd: Command): Promise<Result> {
+  const method = cmd.method;
+  if (!method || typeof method !== 'string') {
+    return { id: cmd.id, ok: false, error: 'method must be a string' };
+  }
+  if (!COOKIES_METHOD_ALLOWLIST.has(method)) {
+    return { id: cmd.id, ok: false, error: `Unsupported chrome.cookies method: ${method}` };
+  }
+
+  const args = Array.isArray(cmd.args) ? cmd.args : [];
+  const api = chrome.cookies as unknown as Record<string, (...input: unknown[]) => Promise<unknown>>;
+  const fn = api[method];
+  if (typeof fn !== 'function') {
+    return { id: cmd.id, ok: false, error: `chrome.cookies.${method} is unavailable` };
+  }
+
+  const data = await fn(...args);
+  return { id: cmd.id, ok: true, data: toJsonSafe(data) };
+}
+
+async function handleDownloadsMethod(cmd: Command): Promise<Result> {
+  const method = cmd.method;
+  if (!method || typeof method !== 'string') {
+    return { id: cmd.id, ok: false, error: 'method must be a string' };
+  }
+  if (!DOWNLOADS_METHOD_ALLOWLIST.has(method)) {
+    return { id: cmd.id, ok: false, error: `Unsupported chrome.downloads method: ${method}` };
+  }
+
+  if (!chrome.downloads) {
+    return { id: cmd.id, ok: false, error: 'chrome.downloads API is unavailable' };
+  }
+
+  const args = Array.isArray(cmd.args) ? cmd.args : [];
+  const api = chrome.downloads as unknown as Record<string, (...input: unknown[]) => Promise<unknown>>;
+  const fn = api[method];
+  if (typeof fn !== 'function') {
+    return { id: cmd.id, ok: false, error: `chrome.downloads.${method} is unavailable` };
+  }
+
+  const data = await fn(...args);
+  return { id: cmd.id, ok: true, data: toJsonSafe(data) };
+}
+
+async function handleStorageMethod(cmd: Command): Promise<Result> {
+  const method = cmd.method;
+  if (!method || typeof method !== 'string') {
+    return { id: cmd.id, ok: false, error: 'method must be a string' };
+  }
+  if (!STORAGE_METHOD_ALLOWLIST.has(method)) {
+    return { id: cmd.id, ok: false, error: `Unsupported chrome.storage method: ${method}` };
+  }
+
+  if (!chrome.storage) {
+    return { id: cmd.id, ok: false, error: 'chrome.storage API is unavailable' };
+  }
+
+  const [areaName, fnName] = method.split('.');
+  const area = (chrome.storage as unknown as Record<string, unknown>)[areaName] as Record<string, (...input: unknown[]) => Promise<unknown>> | undefined;
+  if (!area || typeof area !== 'object') {
+    return { id: cmd.id, ok: false, error: `chrome.storage.${areaName} is unavailable` };
+  }
+  const fn = area[fnName];
+  if (typeof fn !== 'function') {
+    return { id: cmd.id, ok: false, error: `chrome.storage.${method} is unavailable` };
+  }
+
+  const args = Array.isArray(cmd.args) ? cmd.args : [];
+  const data = await fn(...args);
+  return { id: cmd.id, ok: true, data: toJsonSafe(data) };
+}
+
+async function handleReadingListMethod(cmd: Command): Promise<Result> {
+  const method = cmd.method;
+  if (!method || typeof method !== 'string') {
+    return { id: cmd.id, ok: false, error: 'method must be a string' };
+  }
+  if (!READING_LIST_METHOD_ALLOWLIST.has(method)) {
+    return { id: cmd.id, ok: false, error: `Unsupported chrome.readingList method: ${method}` };
+  }
+
+  const readingListApi = (chrome as unknown as Record<string, unknown>).readingList as
+    | Record<string, (...input: unknown[]) => Promise<unknown>>
+    | undefined;
+  if (!readingListApi || typeof readingListApi !== 'object') {
+    return { id: cmd.id, ok: false, error: 'chrome.readingList API is unavailable (Chrome 120+ required)' };
+  }
+
+  const fn = readingListApi[method];
+  if (typeof fn !== 'function') {
+    return { id: cmd.id, ok: false, error: `chrome.readingList.${method} is unavailable` };
+  }
+
+  const args = Array.isArray(cmd.args) ? cmd.args : [];
+  const data = await fn(...args);
+  return { id: cmd.id, ok: true, data: toJsonSafe(data) };
+}
+
+async function handleTopSitesMethod(cmd: Command): Promise<Result> {
+  const method = cmd.method;
+  if (!method || typeof method !== 'string') {
+    return { id: cmd.id, ok: false, error: 'method must be a string' };
+  }
+  if (!TOP_SITES_METHOD_ALLOWLIST.has(method)) {
+    return { id: cmd.id, ok: false, error: `Unsupported chrome.topSites method: ${method}` };
+  }
+
+  if (!chrome.topSites) {
+    return { id: cmd.id, ok: false, error: 'chrome.topSites API is unavailable' };
+  }
+
+  const args = Array.isArray(cmd.args) ? cmd.args : [];
+  const api = chrome.topSites as unknown as Record<string, (...input: unknown[]) => Promise<unknown>>;
+  const fn = api[method];
+  if (typeof fn !== 'function') {
+    return { id: cmd.id, ok: false, error: `chrome.topSites.${method} is unavailable` };
+  }
+
+  const data = await fn(...args);
+  return { id: cmd.id, ok: true, data: toJsonSafe(data) };
+}
+
 const OPTIONAL_PERMISSION_ALLOWLIST = new Set([
   'bookmarks',
   'history',
   'sessions',
+  'topSites',
 ]);
 
 function normalizeOptionalPermissions(input: unknown): string[] {

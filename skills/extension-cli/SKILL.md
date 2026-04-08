@@ -95,6 +95,29 @@ extension-cli sessions get-recently-closed --filter '{"maxResults":10}'
 extension-cli bookmarks search --query-text "extension-cli"
 ```
 
+## Brainstorm: 20 Cross-API Use Cases
+
+1. Morning workspace restore: rebuild `windows/tabs/tab-groups` from `storage` snapshot.
+2. End-of-day archive: split current tabs into `keep/read-later/close`, then persist with `reading-list/bookmarks/storage`.
+3. Automatic tab classification: classify by domain/title rules and regroup via `tab-groups`.
+4. Meeting mode switch: keep only meeting tabs, archive others into `sessions/storage`.
+5. Deep-work anti-distraction: detect social/audible tabs and auto-mute/regroup/minimize.
+6. Top-sites curation: suggest adding high-frequency unbookmarked sites from `top-sites` to `bookmarks`.
+7. Reading funnel: detect repeatedly-opened pages from `top-sites/history` and enqueue to `reading-list`.
+8. Bookmark hygiene assistant: use `bookmarks + history` to mark stale/low-value links.
+9. Duplicate tab cleanup: find same-URL duplicates, preserve active tab, close/reassign others.
+10. Download operations board: stream `downloads events` and persist task states into `storage`.
+11. Download source traceability: map downloads back to source tabs/URLs for audit trail.
+12. Session health checks: validate critical site login state through `cookies` probes.
+13. Multi-account guardrails: detect same-domain cross-window account mixing and separate sessions.
+14. Weekly browsing report: aggregate `history` by domain/topic/time-window for focus insights.
+15. Intent-aware workspace prep: infer project intent from recent `history` and preload tab sets.
+16. Incident replay bundle: capture `tabs/windows/downloads/cookies` event timeline for debugging.
+17. Security cleanup mode: close sensitive tabs, remove scoped cookies, and tear down windows quickly.
+18. Research sprint sandbox: create isolated window, open seed tabs, then archive findings at finish.
+19. Least-privilege automation: `auth grant` before tasks and `auth revoke` after tasks with logs.
+20. Next-best-action suggestions: combine signals from `top-sites/history/reading-list/downloads` to rank next tasks.
+
 ## Bookmark Analytics (analysis.mjs)
 
 Dashboard + metrics:

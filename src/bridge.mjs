@@ -138,6 +138,81 @@ export async function browserBookmarksMethod(method, args = []) {
   }
 }
 
+export async function browserCookiesMethod(method, args = []) {
+  await ensureBridgeReady()
+  try {
+    return await sendCommand('cookies-method', { method, args })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('Unknown action: cookies-method')) {
+      throw new Error(
+        'Connected extension is outdated (missing cookies-method). Rebuild/reload extension-cli extension and restart daemon.',
+      )
+    }
+    throw error
+  }
+}
+
+export async function browserDownloadsMethod(method, args = []) {
+  await ensureBridgeReady()
+  try {
+    return await sendCommand('downloads-method', { method, args })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('Unknown action: downloads-method')) {
+      throw new Error(
+        'Connected extension is outdated (missing downloads-method). Rebuild/reload extension-cli extension and restart daemon.',
+      )
+    }
+    throw error
+  }
+}
+
+export async function browserStorageMethod(method, args = []) {
+  await ensureBridgeReady()
+  try {
+    return await sendCommand('storage-method', { method, args })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('Unknown action: storage-method')) {
+      throw new Error(
+        'Connected extension is outdated (missing storage-method). Rebuild/reload extension-cli extension and restart daemon.',
+      )
+    }
+    throw error
+  }
+}
+
+export async function browserReadingListMethod(method, args = []) {
+  await ensureBridgeReady()
+  try {
+    return await sendCommand('reading-list-method', { method, args })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('Unknown action: reading-list-method')) {
+      throw new Error(
+        'Connected extension is outdated (missing reading-list-method). Rebuild/reload extension-cli extension and restart daemon.',
+      )
+    }
+    throw error
+  }
+}
+
+export async function browserTopSitesMethod(method, args = []) {
+  await ensureBridgeReady()
+  try {
+    return await sendCommand('top-sites-method', { method, args })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (message.includes('Unknown action: top-sites-method')) {
+      throw new Error(
+        'Connected extension is outdated (missing top-sites-method). Rebuild/reload extension-cli extension and restart daemon.',
+      )
+    }
+    throw error
+  }
+}
+
 export async function browserPermissionsContains(permissions = []) {
   await ensureBridgeReady()
   try {

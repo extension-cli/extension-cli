@@ -29,7 +29,7 @@ type PopupStatus = {
   };
 };
 
-type PermissionName = "bookmarks" | "history" | "sessions";
+type PermissionName = "bookmarks" | "history" | "sessions" | "topSites";
 type PermissionBadge =
   | "Checking"
   | "Granted"
@@ -39,7 +39,7 @@ type PermissionBadge =
   | "Removing..."
   | "Error";
 
-const PERMISSIONS: PermissionName[] = ["bookmarks", "history", "sessions"];
+const PERMISSIONS: PermissionName[] = ["bookmarks", "history", "sessions", "topSites"];
 const DOCS_URL = "https://github.com/extension-cli/extension-cli";
 const SKILL_INSTALL_URL =
   "https://github.com/extension-cli/extension-cli#skill-install-one-command";
@@ -121,6 +121,7 @@ function PopupApp() {
     bookmarks: "Checking",
     history: "Checking",
     sessions: "Checking",
+    topSites: "Checking",
   });
 
   async function refreshStatus() {

@@ -174,7 +174,7 @@ function removePermission(name) {
 }
 
 async function refreshPermissionBadges() {
-  const names = ['bookmarks', 'history', 'sessions'];
+  const names = ['bookmarks', 'history', 'sessions', 'topSites'];
   for (const name of names) {
     const badge = document.getElementById(`perm-${name}`);
     if (!badge) continue;
@@ -188,7 +188,7 @@ async function refreshPermissionBadges() {
 }
 
 function wirePermissionButtons() {
-  const names = ['bookmarks', 'history', 'sessions'];
+  const names = ['bookmarks', 'history', 'sessions', 'topSites'];
   for (const name of names) {
     const grantBtn = document.getElementById(`grant-${name}`);
     const revokeBtn = document.getElementById(`revoke-${name}`);

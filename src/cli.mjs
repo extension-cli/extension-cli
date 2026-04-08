@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 import { Command, InvalidArgumentError } from 'commander'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 import {
   browserBookmarksMethod,
+  browserCookiesMethod,
+  browserDownloadsMethod,
   browserPermissionsContains,
   browserPermissionsRemove,
   browserPermissionsRequest,
   browserHistoryMethod,
+  browserReadingListMethod,
   browserSessionsMethod,
+  browserStorageMethod,
+  browserTopSitesMethod,
   browserTabGroupsMethod,
   browserTabsEvents,
   browserTabsEventsClear,
@@ -28,8 +34,13 @@ import {
   TAB_GROUPS_METHOD_NAMES,
 } from './browser/tab-groups-methods.mjs'
 import { BOOKMARKS_METHOD_NAMES, buildBookmarksMethodArgs } from './browser/bookmarks-methods.mjs'
+import { buildCookiesMethodArgs, COOKIES_METHOD_NAMES } from './browser/cookies-methods.mjs'
+import { buildDownloadsMethodArgs, DOWNLOADS_METHOD_NAMES } from './browser/downloads-methods.mjs'
 import { buildHistoryMethodArgs, HISTORY_METHOD_NAMES } from './browser/history-methods.mjs'
+import { buildReadingListMethodArgs, READING_LIST_METHOD_NAMES } from './browser/reading-list-methods.mjs'
 import { buildSessionsMethodArgs, SESSIONS_METHOD_NAMES } from './browser/sessions-methods.mjs'
+import { buildStorageMethodArgs, STORAGE_METHOD_NAMES } from './browser/storage-methods.mjs'
+import { buildTopSitesMethodArgs, TOP_SITES_METHOD_NAMES } from './browser/top-sites-methods.mjs'
 import { buildWindowsMethodArgs, WINDOWS_METHOD_NAMES } from './browser/windows-methods.mjs'
 import {
   buildFtMetrics,
@@ -41,12 +52,16 @@ import {
   renderFtViz,
 } from './analysis.mjs'
 import { syncBookmarksStore, syncHistoryStore } from './browser/sync.mjs'
+import { renderTabsQueryTable } from './browser/tabs-query-table.mjs'
 
+const require = createRequire(import.meta.url)
+const packageJson = require('../package.json')
 const program = new Command()
 const PRIVACY_PERMISSION_BY_NAMESPACE = {
   bookmarks: 'bookmarks',
   history: 'history',
   sessions: 'sessions',
+  'top-sites': 'topSites',
 }
 
 function printResult(result) {
@@ -357,11 +372,12 @@ function attachOptionalPermissionGuard(command, namespace) {
 }
 
 function registerAuthCommands(command, namespace) {
-  const auth = command.command('auth').description(`Manage optional chrome.${namespace} permission`)
+  const permission = permissionOf(namespace)
+  const auth = command.command('auth').description(`Manage optional chrome.${permission} permission`)
 
   auth
     .command('grant')
-    .description(`Grant chrome.${namespace} permission (requires Enter confirmation; may require popup click)`)
+    .description(`Grant chrome.${permission} permission (requires Enter confirmation; may require popup click)`)
     .action(async () => {
       try {
         const data = await runPermissionAction(namespace, 'request')
@@ -374,7 +390,7 @@ function registerAuthCommands(command, namespace) {
 
   auth
     .command('revoke')
-    .description(`Revoke chrome.${namespace} permission (requires Enter confirmation)`)
+    .description(`Revoke chrome.${permission} permission (requires Enter confirmation)`)
     .action(async () => {
       try {
         const data = await runPermissionAction(namespace, 'remove')
@@ -387,7 +403,7 @@ function registerAuthCommands(command, namespace) {
 
   auth
     .command('events')
-    .description(`Read bridged chrome.permissions events for chrome.${namespace}`)
+    .description(`Read bridged chrome.permissions events for chrome.${permission}`)
     .option('--since <ms>', 'Only events after this unix ms timestamp', value =>
       parseNumberOption(value, '--since'))
     .option('--limit <n>', 'Max returned events', value =>
@@ -456,8 +472,8 @@ function registerAuthCommands(command, namespace) {
 
 program
   .name('extension-cli')
-  .description('Browser + rendering automation CLI')
-  .version('0.1.0')
+  .description(packageJson.description)
+  .version(packageJson.version)
   .option('--yes', 'Acknowledge and proceed for interactive safety prompts')
   .option('--risk-ack <commandPath>', 'Explicit risk acknowledgement token (e.g. "tabs remove", or "ALL")')
 
@@ -656,14 +672,21 @@ const browserWindows = program.command('windows').description('Chrome windows AP
 const browserHistory = program.command('history').description('Chrome history API')
 const browserSessions = program.command('sessions').description('Chrome sessions API')
 const browserBookmarks = program.command('bookmarks').description('Chrome bookmarks API')
+const browserCookies = program.command('cookies').description('Chrome cookies API')
+const browserDownloads = program.command('downloads').description('Chrome downloads API')
+const browserStorage = program.command('storage').description('Chrome storage API')
+const browserReadingList = program.command('reading-list').description('Chrome readingList API')
+const browserTopSites = program.command('top-sites').description('Chrome topSites API')
 
 registerAuthCommands(browserBookmarks, 'bookmarks')
 registerAuthCommands(browserHistory, 'history')
 registerAuthCommands(browserSessions, 'sessions')
+registerAuthCommands(browserTopSites, 'top-sites')
 
 attachOptionalPermissionGuard(browserBookmarks, 'bookmarks')
 attachOptionalPermissionGuard(browserHistory, 'history')
 attachOptionalPermissionGuard(browserSessions, 'sessions')
+attachOptionalPermissionGuard(browserTopSites, 'top-sites')
 
 async function callTabsMethod(method, options = {}) {
   try {
@@ -737,10 +760,146 @@ async function callBookmarksMethod(method, options = {}) {
   }
 }
 
+async function callCookiesMethod(method, options = {}) {
+  try {
+    const normalized = typeof options?.opts === 'function' ? options.opts() : (options || {})
+    const args = buildCookiesMethodArgs(method, normalized)
+    const data = await browserCookiesMethod(method, args)
+    printResult({ method, args, data })
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
+}
+
+async function callDownloadsMethod(method, options = {}) {
+  try {
+    const normalized = typeof options?.opts === 'function' ? options.opts() : (options || {})
+    const args = buildDownloadsMethodArgs(method, normalized)
+    const data = await browserDownloadsMethod(method, args)
+    printResult({ method, args, data })
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
+}
+
+async function callStorageMethod(method, options = {}) {
+  try {
+    const normalized = typeof options?.opts === 'function' ? options.opts() : (options || {})
+    const args = buildStorageMethodArgs(method, normalized)
+    const data = await browserStorageMethod(method, args)
+    printResult({ method, args, data })
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
+}
+
+async function callReadingListMethod(method, options = {}) {
+  try {
+    const normalized = typeof options?.opts === 'function' ? options.opts() : (options || {})
+    const args = buildReadingListMethodArgs(method, normalized)
+    const data = await browserReadingListMethod(method, args)
+    printResult({ method, args, data })
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
+}
+
+async function callTopSitesMethod(method, options = {}) {
+  try {
+    const normalized = typeof options?.opts === 'function' ? options.opts() : (options || {})
+    const args = buildTopSitesMethodArgs(method, normalized)
+    const data = await browserTopSitesMethod(method, args)
+    printResult({ method, args, data })
+  } catch (error) {
+    console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+    process.exit(1)
+  }
+}
+
+function registerNamespaceEventsCommands(command, namespace, exampleType) {
+  command
+    .command('events')
+    .description(`Read bridged chrome.${namespace} events from extension -> daemon`)
+    .option('--since <ms>', 'Only events after this unix ms timestamp', value =>
+      parseNumberOption(value, '--since'))
+    .option('--limit <n>', 'Max returned events', value =>
+      parseNumberOption(value, '--limit'))
+    .option('--type <name>', `Filter by event name, e.g. ${exampleType}`)
+    .option('--follow', 'Stream continuously for new events')
+    .option('--transport <transport>', 'Stream transport for --follow: ws|sse', 'ws')
+    .action(async options => {
+      try {
+        if (!options.follow) {
+          const data = await browserTabsEvents({
+            since: options.since,
+            limit: options.limit,
+            type: options.type,
+            namespace,
+            requireBridge: true,
+          })
+          printResult(data)
+          return
+        }
+
+        let closedBySignal = false
+        const stream = await browserTabsEventsStream({
+          transport: options.transport,
+          type: options.type,
+          namespace,
+          onReady: () => {},
+          onEvent: event => {
+            printResult(event)
+          },
+          onError: error => {
+            if (closedBySignal) return
+            console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+          },
+        })
+
+        const closeStream = () => {
+          closedBySignal = true
+          stream.close()
+        }
+
+        process.on('SIGINT', () => {
+          closeStream()
+          process.exit(0)
+        })
+        process.on('SIGTERM', () => {
+          closeStream()
+          process.exit(0)
+        })
+
+        await new Promise(() => {})
+      } catch (error) {
+        console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+        process.exit(1)
+      }
+    })
+
+  command
+    .command('events-clear')
+    .description('Clear buffered bridged events from daemon')
+    .action(async () => {
+      try {
+        const ok = await browserTabsEventsClear()
+        printResult({ ok })
+      } catch (error) {
+        console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+        process.exit(1)
+      }
+    })
+}
+
 browserTabs
   .command('query')
   .description('chrome.tabs.query(queryInfo): Get tabs matching QueryInfo filters')
   .option('--query <json>', 'Raw chrome.tabs.query QueryInfo JSON')
+  .option('--table', 'Render a boxed TUI-style table output')
   .option('--active [boolean]', 'Filter by active state (true|false)', value =>
     parseBooleanOption(value, '--active'))
   .option('--current-window [boolean]', 'Filter by current window (true|false)', value =>
@@ -813,6 +972,10 @@ Examples:
       }
 
       const tabs = await browserTabsQuery(merged)
+      if (options.table) {
+        console.log(renderTabsQueryTable(tabs))
+        return
+      }
       printResult({ count: Array.isArray(tabs) ? tabs.length : 0, tabs })
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
@@ -1966,6 +2129,336 @@ browserBookmarks
       console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
       process.exit(1)
     }
+  })
+
+browserCookies
+  .command('get')
+  .description('chrome.cookies.get(details): Get a single cookie')
+  .requiredOption('--details <json>', 'details JSON, e.g. {"url":"https://example.com","name":"sid"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callCookiesMethod('get', options))
+
+browserCookies
+  .command('get-all')
+  .description('chrome.cookies.getAll(details?): Get matching cookies')
+  .option('--details <json>', 'details JSON, e.g. {"domain":"example.com"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callCookiesMethod('getAll', options))
+
+browserCookies
+  .command('get-all-cookie-stores')
+  .description('chrome.cookies.getAllCookieStores(): List cookie stores')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callCookiesMethod('getAllCookieStores', options))
+
+browserCookies
+  .command('set')
+  .description('chrome.cookies.set(details): Set a cookie')
+  .requiredOption('--details <json>', 'details JSON, e.g. {"url":"https://example.com","name":"sid","value":"x"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callCookiesMethod('set', options))
+
+browserCookies
+  .command('remove')
+  .description('chrome.cookies.remove(details): Remove a cookie')
+  .requiredOption('--details <json>', 'details JSON, e.g. {"url":"https://example.com","name":"sid"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callCookiesMethod('remove', options))
+
+browserCookies
+  .command('methods')
+  .description('List all integrated chrome.cookies methods')
+  .action(() => {
+    printResult({ count: COOKIES_METHOD_NAMES.length, methods: formatMethodNames(COOKIES_METHOD_NAMES) })
+  })
+
+registerNamespaceEventsCommands(browserCookies, 'cookies', 'onChanged')
+
+browserDownloads
+  .command('download')
+  .description('chrome.downloads.download(options): Start a download')
+  .requiredOption('--options <json>', 'options JSON, e.g. {"url":"https://example.com/file.zip"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callDownloadsMethod('download', options))
+
+browserDownloads
+  .command('search')
+  .description('chrome.downloads.search(query?): Search downloads')
+  .option('--query <json>', 'query JSON, e.g. {"query":["example"],"limit":20}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callDownloadsMethod('search', options))
+
+browserDownloads
+  .command('erase')
+  .description('chrome.downloads.erase(query): Erase downloads from history')
+  .requiredOption('--query <json>', 'query JSON, e.g. {"state":"complete"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callDownloadsMethod('erase', options))
+
+browserDownloads
+  .command('get-file-icon')
+  .description('chrome.downloads.getFileIcon(downloadId, options?): Get file icon URL')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--icon-options <json>', 'options JSON, e.g. {"size":32}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('getFileIcon', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('accept-danger')
+  .description('chrome.downloads.acceptDanger(downloadId): Accept dangerous download')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('acceptDanger', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('cancel')
+  .description('chrome.downloads.cancel(downloadId): Cancel a download')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('cancel', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('open')
+  .description('chrome.downloads.open(downloadId): Open downloaded file')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('open', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('pause')
+  .description('chrome.downloads.pause(downloadId): Pause a download')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('pause', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('remove-file')
+  .description('chrome.downloads.removeFile(downloadId): Remove downloaded file')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('removeFile', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('resume')
+  .description('chrome.downloads.resume(downloadId): Resume a download')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('resume', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('show')
+  .description('chrome.downloads.show(downloadId): Show download in folder')
+  .argument('<downloadId>', 'Download ID')
+  .option('--download-id <id>', 'Download ID (same as positional)')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async (downloadId, options) => callDownloadsMethod('show', { ...options, _downloadId: downloadId }))
+
+browserDownloads
+  .command('show-default-folder')
+  .description('chrome.downloads.showDefaultFolder(): Open default downloads folder')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callDownloadsMethod('showDefaultFolder', options))
+
+browserDownloads
+  .command('methods')
+  .description('List all integrated chrome.downloads methods')
+  .action(() => {
+    printResult({ count: DOWNLOADS_METHOD_NAMES.length, methods: formatMethodNames(DOWNLOADS_METHOD_NAMES) })
+  })
+
+registerNamespaceEventsCommands(browserDownloads, 'downloads', 'onChanged')
+
+browserStorage
+  .command('local-get')
+  .description('chrome.storage.local.get(keys?): Get local storage values')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('local.get', options))
+
+browserStorage
+  .command('local-set')
+  .description('chrome.storage.local.set(items): Set local storage values')
+  .requiredOption('--items <json>', 'items JSON object, e.g. {"token":"abc"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('local.set', options))
+
+browserStorage
+  .command('local-remove')
+  .description('chrome.storage.local.remove(keys): Remove local storage values')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('local.remove', options))
+
+browserStorage
+  .command('local-clear')
+  .description('chrome.storage.local.clear(): Clear local storage')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('local.clear', options))
+
+browserStorage
+  .command('local-bytes')
+  .description('chrome.storage.local.getBytesInUse(keys?): Get local storage usage')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('local.getBytesInUse', options))
+
+browserStorage
+  .command('sync-get')
+  .description('chrome.storage.sync.get(keys?): Get sync storage values')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('sync.get', options))
+
+browserStorage
+  .command('sync-set')
+  .description('chrome.storage.sync.set(items): Set sync storage values')
+  .requiredOption('--items <json>', 'items JSON object, e.g. {"token":"abc"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('sync.set', options))
+
+browserStorage
+  .command('sync-remove')
+  .description('chrome.storage.sync.remove(keys): Remove sync storage values')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('sync.remove', options))
+
+browserStorage
+  .command('sync-clear')
+  .description('chrome.storage.sync.clear(): Clear sync storage')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('sync.clear', options))
+
+browserStorage
+  .command('sync-bytes')
+  .description('chrome.storage.sync.getBytesInUse(keys?): Get sync storage usage')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('sync.getBytesInUse', options))
+
+browserStorage
+  .command('session-get')
+  .description('chrome.storage.session.get(keys?): Get session storage values')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('session.get', options))
+
+browserStorage
+  .command('session-set')
+  .description('chrome.storage.session.set(items): Set session storage values')
+  .requiredOption('--items <json>', 'items JSON object, e.g. {"token":"abc"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('session.set', options))
+
+browserStorage
+  .command('session-remove')
+  .description('chrome.storage.session.remove(keys): Remove session storage values')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('session.remove', options))
+
+browserStorage
+  .command('session-clear')
+  .description('chrome.storage.session.clear(): Clear session storage')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('session.clear', options))
+
+browserStorage
+  .command('session-bytes')
+  .description('chrome.storage.session.getBytesInUse(keys?): Get session storage usage')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('session.getBytesInUse', options))
+
+browserStorage
+  .command('managed-get')
+  .description('chrome.storage.managed.get(keys?): Get managed storage values')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('managed.get', options))
+
+browserStorage
+  .command('managed-bytes')
+  .description('chrome.storage.managed.getBytesInUse(keys?): Get managed storage usage')
+  .option('--keys <json>', 'keys JSON, e.g. "token" or ["a","b"]')
+  .option('--key <key>', 'single key shortcut')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callStorageMethod('managed.getBytesInUse', options))
+
+browserStorage
+  .command('methods')
+  .description('List all integrated chrome.storage methods')
+  .action(() => {
+    printResult({ count: STORAGE_METHOD_NAMES.length, methods: STORAGE_METHOD_NAMES })
+  })
+
+registerNamespaceEventsCommands(browserStorage, 'storage', 'onChanged')
+
+browserReadingList
+  .command('add-entry')
+  .description('chrome.readingList.addEntry(entry): Add a reading list entry')
+  .requiredOption('--entry <json>', 'entry JSON, e.g. {"url":"https://example.com","title":"Example","hasBeenRead":false}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callReadingListMethod('addEntry', options))
+
+browserReadingList
+  .command('query')
+  .description('chrome.readingList.query(query): Query reading list entries')
+  .option('--query <json>', 'query JSON, e.g. {"hasBeenRead":false}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callReadingListMethod('query', options))
+
+browserReadingList
+  .command('update-entry')
+  .description('chrome.readingList.updateEntry(entry): Update reading list entry')
+  .requiredOption('--entry <json>', 'entry JSON, e.g. {"url":"https://example.com","hasBeenRead":true}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callReadingListMethod('updateEntry', options))
+
+browserReadingList
+  .command('remove-entry')
+  .description('chrome.readingList.removeEntry(details): Remove a reading list entry')
+  .requiredOption('--details <json>', 'details JSON, e.g. {"url":"https://example.com"}')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callReadingListMethod('removeEntry', options))
+
+browserReadingList
+  .command('methods')
+  .description('List all integrated chrome.readingList methods')
+  .action(() => {
+    printResult({ count: READING_LIST_METHOD_NAMES.length, methods: formatMethodNames(READING_LIST_METHOD_NAMES) })
+  })
+
+registerNamespaceEventsCommands(browserReadingList, 'readingList', 'onEntryAdded')
+
+browserTopSites
+  .command('get')
+  .description('chrome.topSites.get(): Get top visited sites')
+  .option('--args <json>', 'Raw args JSON array, overrides other flags')
+  .action(async options => callTopSitesMethod('get', options))
+
+browserTopSites
+  .command('methods')
+  .description('List all integrated chrome.topSites methods')
+  .action(() => {
+    printResult({ count: TOP_SITES_METHOD_NAMES.length, methods: formatMethodNames(TOP_SITES_METHOD_NAMES) })
   })
 
 registerRenderingCommands(program)

@@ -16,7 +16,7 @@ flowchart LR
   A["AI Agent / User"] --> B["extension-cli (CLI)"]
   B --> C["Local Daemon (127.0.0.1:19883)"]
   C --> D["Browser Extension (WebSocket /ext)"]
-  D --> E["Chrome APIs (tabs/windows/history/sessions/bookmarks/debugger/cookies)"]
+  D --> E["Chrome APIs (tabs/windows/history/sessions/bookmarks/topSites/cookies/downloads/storage/readingList/debugger)"]
   E --> D
   D --> C
   C --> B
@@ -30,7 +30,7 @@ flowchart LR
 
 ## Features
 
-- Unified browser API surface: `tabs`, `tab-groups`, `windows`, `history`, `sessions`, `bookmarks`.
+- Unified browser API surface: `tabs`, `tab-groups`, `windows`, `history`, `sessions`, `bookmarks`, `top-sites`, `cookies`, `downloads`, `storage`, `reading-list`.
 - Event bridge support (`events`, `events-clear`, `--follow`) for runtime observability.
 - Cloudflare Browser Rendering integration (`rendering` namespace).
 - Risk controls for delete/remove operations:
@@ -132,6 +132,16 @@ extension-cli sessions remove-tab-value
 extension-cli sessions remove-window-value
 extension-cli bookmarks remove
 extension-cli bookmarks remove-tree
+extension-cli cookies remove
+extension-cli downloads erase
+extension-cli downloads remove-file
+extension-cli storage local-remove
+extension-cli storage sync-remove
+extension-cli storage session-remove
+extension-cli storage local-clear
+extension-cli storage sync-clear
+extension-cli storage session-clear
+extension-cli reading-list remove-entry
 ```
 
 ### Core
@@ -280,6 +290,94 @@ extension-cli bookmarks update
 extension-cli bookmarks methods
 extension-cli bookmarks events
 extension-cli bookmarks events-clear
+```
+
+### Top Sites (`chrome.topSites`)
+
+```bash
+extension-cli top-sites auth grant
+extension-cli top-sites auth revoke
+extension-cli top-sites auth events
+
+extension-cli top-sites get
+extension-cli top-sites methods
+```
+
+### Cookies (`chrome.cookies`)
+
+```bash
+extension-cli cookies get
+extension-cli cookies get-all
+extension-cli cookies get-all-cookie-stores
+extension-cli cookies set
+extension-cli cookies remove
+
+extension-cli cookies methods
+extension-cli cookies events
+extension-cli cookies events-clear
+```
+
+### Downloads (`chrome.downloads`)
+
+```bash
+extension-cli downloads download
+extension-cli downloads search
+extension-cli downloads erase
+extension-cli downloads get-file-icon
+extension-cli downloads accept-danger
+extension-cli downloads cancel
+extension-cli downloads open
+extension-cli downloads pause
+extension-cli downloads remove-file
+extension-cli downloads resume
+extension-cli downloads show
+extension-cli downloads show-default-folder
+
+extension-cli downloads methods
+extension-cli downloads events
+extension-cli downloads events-clear
+```
+
+### Storage (`chrome.storage`)
+
+```bash
+extension-cli storage local-get
+extension-cli storage local-set
+extension-cli storage local-remove
+extension-cli storage local-clear
+extension-cli storage local-bytes
+
+extension-cli storage sync-get
+extension-cli storage sync-set
+extension-cli storage sync-remove
+extension-cli storage sync-clear
+extension-cli storage sync-bytes
+
+extension-cli storage session-get
+extension-cli storage session-set
+extension-cli storage session-remove
+extension-cli storage session-clear
+extension-cli storage session-bytes
+
+extension-cli storage managed-get
+extension-cli storage managed-bytes
+
+extension-cli storage methods
+extension-cli storage events
+extension-cli storage events-clear
+```
+
+### Reading List (`chrome.readingList`)
+
+```bash
+extension-cli reading-list add-entry
+extension-cli reading-list query
+extension-cli reading-list update-entry
+extension-cli reading-list remove-entry
+
+extension-cli reading-list methods
+extension-cli reading-list events
+extension-cli reading-list events-clear
 ```
 
 ### Rendering (Cloudflare Browser Rendering REST API)
