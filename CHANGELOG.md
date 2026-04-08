@@ -1,3 +1,12 @@
+## [0.1.3](https://github.com/extension-cli/extension-cli/compare/v0.1.2...v0.1.3) (2026-04-08)
+
+
+### Features
+
+* update the README.md ([568dbdb](https://github.com/extension-cli/extension-cli/commit/568dbdba627b21d313560ebee203fe5e42ab6987))
+
+
+
 ## [0.1.2](https://github.com/extension-cli/extension-cli/compare/v0.1.1...v0.1.2) (2026-04-06)
 
 
