@@ -4,7 +4,7 @@ description: Use extension-cli APIs through daemon + Chrome extension bridge (ta
 allowed-tools: Bash(extension-cli:*), Read, Write, Edit
 ---
 
-# extension-cli browser
+# extension-cli
 
 Package: `@extension-cli/cli`  
 Executable: `extension-cli`

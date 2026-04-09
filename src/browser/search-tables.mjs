@@ -174,56 +174,115 @@ function fitColumnWidths(terminalWidth, preferredWidths, minWidths, shrinkOrder)
   return widths
 }
 
-function buildFlags(tab) {
-  const flags = []
-  if (tab?.active) flags.push('A')
-  if (tab?.pinned) flags.push('P')
-  if (tab?.audible) flags.push('U')
-  if (tab?.discarded) flags.push('D')
-  if (tab?.mutedInfo?.muted) flags.push('M')
-  return flags.join(',') || '-'
-}
-
-export function renderTabsQueryTable(tabs, options = {}) {
-  const list = Array.isArray(tabs) ? tabs : []
-
-  const terminalWidth = options.terminalWidth ?? detectTerminalWidth(100)
-  const widths = fitColumnWidths(
-    terminalWidth,
-    [
-      options.indexWidth ?? 3,
-      options.flagsWidth ?? 7,
-      options.titleWidth ?? 28,
-      options.urlWidth ?? 54,
-    ],
-    [
-      2,
-      5,
-      options.minTitleWidth ?? 12,
-      options.minUrlWidth ?? 20,
-    ],
-    [3, 2, 1, 0],
-  )
+function renderTable(title, headers, widths, rows, notes = [], options = {}) {
   const chars = resolveTableChars(options)
+  const totalContentWidth = widths.reduce((sum, width) => sum + width + 3, -3)
   const topBorder = createBorder(widths, chars, chars.topLeft, chars.topMid, chars.topRight)
   const midBorder = createBorder(widths, chars, chars.midLeft, chars.midMid, chars.midRight)
   const bottomBorder = createBorder(widths, chars, chars.bottomLeft, chars.bottomMid, chars.bottomRight)
-
-  const title = `Tabs Query Results (${list.length} tab${list.length === 1 ? '' : 's'})`
-  const legend = 'Flags: A=active, P=pinned, U=audible, D=discarded, M=muted'
-
-  const header = renderRow(['#', 'FLAGS', 'TITLE', 'URL'], widths, chars)
-
-  const rows = list.map((tab, idx) => {
-    const index = String(idx + 1)
-    const flags = buildFlags(tab)
-    const titleText = toSingleLine(tab?.title) || '(untitled)'
-    const urlText = toSingleLine(tab?.url) || '(no url)'
-    return renderRow([index, flags, titleText, urlText], widths, chars)
-  })
+  const headerLine = renderRow(headers, widths, chars)
   const bodyRows = rows.length > 0
-    ? rows.flatMap((row, index) => (index < rows.length - 1 ? [row, midBorder] : [row]))
-    : [`${chars.v} ${formatCell('(no results)', widths.reduce((sum, width) => sum + width + 3, -3))} ${chars.v}`]
+    ? rows.map(row => renderRow(row, widths, chars))
+    : [`${chars.v} ${formatCell('(no results)', totalContentWidth)} ${chars.v}`]
+  const separatedBodyRows = bodyRows.flatMap((line, index) => (
+    index < bodyRows.length - 1 ? [line, midBorder] : [line]
+  ))
+  return [title, ...notes, topBorder, headerLine, midBorder, ...separatedBodyRows, bottomBorder].join('\n')
+}
 
-  return [title, legend, topBorder, header, midBorder, ...bodyRows, bottomBorder].join('\n')
+function formatTimestamp(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n <= 0) return '-'
+  return new Date(n).toISOString().replace('T', ' ').replace('Z', ' UTC')
+}
+
+export function renderWindowsGetAllTable(windows, options = {}) {
+  const list = Array.isArray(windows) ? windows : []
+  const terminalWidth = options.terminalWidth ?? detectTerminalWidth(100)
+
+  const widths = fitColumnWidths(
+    terminalWidth,
+    [3, 6, 8, 10, 7, 9, 4, 32],
+    [2, 4, 4, 6, 5, 5, 3, 14],
+    [7, 3, 2, 5, 4, 1, 6, 0],
+  )
+
+  const rows = list.map((item, idx) => [
+    String(idx + 1),
+    item?.id,
+    item?.type || '-',
+    item?.state || '-',
+    item?.focused ? 'yes' : 'no',
+    item?.incognito ? 'yes' : 'no',
+    Array.isArray(item?.tabs) ? item.tabs.length : 0,
+    item?.title || '(window)',
+  ])
+
+  return renderTable(
+    `Windows GetAll Results (${list.length} window${list.length === 1 ? '' : 's'})`,
+    ['#', 'ID', 'TYPE', 'STATE', 'FOCUS', 'INCOGNITO', 'TABS', 'TITLE'],
+    widths,
+    rows,
+    [],
+    options,
+  )
+}
+
+export function renderHistorySearchTable(entries, options = {}) {
+  const list = Array.isArray(entries) ? entries : []
+  const terminalWidth = options.terminalWidth ?? detectTerminalWidth(100)
+
+  const widths = fitColumnWidths(
+    terminalWidth,
+    [3, 6, 5, 24, 22, 48],
+    [2, 4, 4, 19, 10, 16],
+    [5, 4, 3, 1, 2, 0],
+  )
+
+  const rows = list.map((item, idx) => [
+    String(idx + 1),
+    item?.visitCount ?? 0,
+    item?.typedCount ?? 0,
+    formatTimestamp(item?.lastVisitTime),
+    item?.title || '(untitled)',
+    item?.url || '(no url)',
+  ])
+
+  return renderTable(
+    `History Search Results (${list.length} item${list.length === 1 ? '' : 's'})`,
+    ['#', 'VISIT', 'TYPED', 'LAST_VISIT', 'TITLE', 'URL'],
+    widths,
+    rows,
+    [],
+    options,
+  )
+}
+
+export function renderBookmarksSearchTable(entries, options = {}) {
+  const list = Array.isArray(entries) ? entries : []
+  const terminalWidth = options.terminalWidth ?? detectTerminalWidth(100)
+
+  const widths = fitColumnWidths(
+    terminalWidth,
+    [3, 8, 6, 28, 48],
+    [2, 4, 4, 10, 16],
+    [4, 3, 1, 2, 0],
+  )
+
+  const rows = list.map((item, idx) => [
+    String(idx + 1),
+    item?.id || '-',
+    item?.url ? 'LINK' : 'FOLDER',
+    item?.title || '(untitled)',
+    item?.url || '-',
+  ])
+
+  return renderTable(
+    `Bookmarks Search Results (${list.length} item${list.length === 1 ? '' : 's'})`,
+    ['#', 'ID', 'TYPE', 'TITLE', 'URL'],
+    widths,
+    rows,
+    [],
+    options,
+  )
 }

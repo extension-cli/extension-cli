@@ -53,6 +53,11 @@ import {
 } from './analysis.mjs'
 import { syncBookmarksStore, syncHistoryStore } from './browser/sync.mjs'
 import { renderTabsQueryTable } from './browser/tabs-query-table.mjs'
+import {
+  renderBookmarksSearchTable,
+  renderHistorySearchTable,
+  renderWindowsGetAllTable,
+} from './browser/search-tables.mjs'
 
 const require = createRequire(import.meta.url)
 const packageJson = require('../package.json')
@@ -1379,6 +1384,7 @@ browserWindows
   .command('get-all')
   .description('chrome.windows.getAll(getInfo?): Get all windows')
   .option('--get-info <json>', 'getInfo JSON, e.g. {"populate":true}')
+  .option('--table', 'Render a boxed TUI-style table output')
   .option('--args <json>', 'Raw args JSON array, overrides other flags')
   .addHelpText('after', `
 getInfo notes:
@@ -1389,8 +1395,22 @@ getInfo notes:
 Examples:
   extension-cli windows get-all --get-info '{"populate":true}'
   extension-cli windows get-all --get-info '{"populate":false,"windowTypes":["normal"]}'
+  extension-cli windows get-all --table
 `)
-  .action(async options => callWindowsMethod('getAll', options))
+  .action(async options => {
+    try {
+      const args = buildWindowsMethodArgs('getAll', options)
+      const data = await browserWindowsMethod('getAll', args)
+      if (options.table) {
+        console.log(renderWindowsGetAllTable(data))
+        return
+      }
+      printResult({ method: 'getAll', args, data })
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+      process.exit(1)
+    }
+  })
 
 browserWindows
   .command('get-current')
@@ -1615,6 +1635,7 @@ browserHistory
   .command('search')
   .description('chrome.history.search(query): Search browsing history')
   .requiredOption('--query <json>', 'query JSON, e.g. {"text":"example","maxResults":10}')
+  .option('--table', 'Render a boxed TUI-style table output')
   .option('--args <json>', 'Raw args JSON array, overrides other flags')
   .addHelpText('after', `
 Query fields:
@@ -1625,8 +1646,22 @@ Query fields:
 Examples:
   extension-cli history search --query '{"text":"github","maxResults":20}'
   extension-cli history search --query '{"text":"","startTime":1704067200000,"endTime":1706745600000,"maxResults":500}'
+  extension-cli history search --query '{"text":"openai","maxResults":20}' --table
 `)
-  .action(async options => callHistoryMethod('search', options))
+  .action(async options => {
+    try {
+      const args = buildHistoryMethodArgs('search', options)
+      const data = await browserHistoryMethod('search', args)
+      if (options.table) {
+        console.log(renderHistorySearchTable(data))
+        return
+      }
+      printResult({ method: 'search', args, data })
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+      process.exit(1)
+    }
+  })
 
 browserHistory
   .command('methods')
@@ -2030,6 +2065,7 @@ browserBookmarks
   .description('chrome.bookmarks.search(query): Search bookmarks')
   .option('--query <json>', 'query as JSON object/string')
   .option('--query-text <text>', 'query as plain text')
+  .option('--table', 'Render a boxed TUI-style table output')
   .option('--args <json>', 'Raw args JSON array, overrides other flags')
   .addHelpText('after', `
 Search modes:
@@ -2039,8 +2075,22 @@ Examples:
   extension-cli bookmarks search --query-text "openai"
   extension-cli bookmarks search --query '{"title":"Docs"}'
   extension-cli bookmarks search --query '{"url":"github.com"}'
+  extension-cli bookmarks search --query-text "openai" --table
 `)
-  .action(async options => callBookmarksMethod('search', options))
+  .action(async options => {
+    try {
+      const args = buildBookmarksMethodArgs('search', options)
+      const data = await browserBookmarksMethod('search', args)
+      if (options.table) {
+        console.log(renderBookmarksSearchTable(data))
+        return
+      }
+      printResult({ method: 'search', args, data })
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+      process.exit(1)
+    }
+  })
 
 browserBookmarks
   .command('update')
