@@ -1,8 +1,18 @@
+## [0.1.4](https://github.com/extension-cli/extension-cli/compare/v0.1.3...v0.1.4) (2026-04-09)
+
+
+### Features
+
+* improve the table format ([ba182ec](https://github.com/extension-cli/extension-cli/commit/ba182ec0d71d0c6c30cf2643e45e7a936b9c595e))
+
+
+
 ## [0.1.3](https://github.com/extension-cli/extension-cli/compare/v0.1.2...v0.1.3) (2026-04-08)
 
 
 ### Features
 
+* add new API ([a21ba4e](https://github.com/extension-cli/extension-cli/commit/a21ba4ed87155802f407ce18e781fe350304275c))
 * update the README.md ([568dbdb](https://github.com/extension-cli/extension-cli/commit/568dbdba627b21d313560ebee203fe5e42ab6987))
 
 

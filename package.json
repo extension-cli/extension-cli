@@ -1,6 +1,6 @@
 {
   "name": "@extension-cli/cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "A skill-first browser extension CLI for AI agents on Chrome, Firefox, and Edge.",
   "scripts": {
     "start": "node src/cli.mjs",
